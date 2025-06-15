@@ -23,3 +23,6 @@ data.json
 
 # Exclude sensitive S3 configuration
 /config/s3Config.json
+
+# 忽略文档目录
+docs/

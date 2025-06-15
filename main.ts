@@ -14,6 +14,9 @@ export default class MyPlugin extends Plugin {
 		this.s3Config = this.loadS3Config();
 		console.log('S3配置加载成功:', this.s3Config);
 		new Notice('S3配置加载成功');
+		
+		// 注册粘贴事件处理
+		this.registerEvent(this.app.workspace.on('editor-paste', this.handlePasteEvent.bind(this)));
 
 		// 创建左侧功能区图标
 		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
@@ -27,11 +30,40 @@ export default class MyPlugin extends Plugin {
 
 		// 示例编辑器命令
 		this.addCommand({
-			id: 'sample-editor-command',
-			name: 'Sample editor command',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				console.log(editor.getSelection());
-				editor.replaceSelection('Sample Editor Command');
+			id: 'upload-image-to-s3',
+			name: '上传图片到S3',
+			editorCallback: async (editor: Editor, view: MarkdownView) => {
+				// 保存当前编辑器引用
+				const currentEditor = editor;
+				
+				// 创建文件选择输入框
+				const input = document.createElement('input');
+				input.type = 'file';
+				input.accept = 'image/*';
+				
+				input.onchange = async (e) => {
+					const file = (e.target as HTMLInputElement).files?.[0];
+					if (!file) return;
+					
+					try {
+						new Notice('正在上传图片...');
+						const markdownLink = await this.uploadImage(file);
+						
+						// 确保编辑器仍然活动
+						if (this.app.workspace.activeEditor?.editor === currentEditor) {
+							currentEditor.replaceSelection(markdownLink);
+							new Notice('图片上传成功！');
+						} else {
+							new Notice('图片上传成功！请手动粘贴链接: ' + markdownLink);
+							navigator.clipboard.writeText(markdownLink);
+						}
+					} catch (error) {
+						console.error(error);
+						new Notice(`上传失败: ${error.message}`);
+					}
+				};
+				
+				input.click();
 			}
 		});
 
@@ -97,6 +129,72 @@ export default class MyPlugin extends Plugin {
 				region: '',
 				useSSL: true
 			};
+		}
+	}
+	
+	// 上传图片并返回markdown链接
+	async uploadImage(file: File): Promise<string> {
+		try {
+			const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3');
+			
+			const client = new S3Client({
+				endpoint: this.s3Config.endpoint,
+				region: this.s3Config.region || 'us-east-1',
+				credentials: {
+					accessKeyId: this.s3Config.accessKeyId,
+					secretAccessKey: this.s3Config.secretAccessKey
+				},
+				forcePathStyle: true,
+				tls: this.s3Config.useSSL
+			});
+			
+			const key = `images/${Date.now()}_${file.name}`;
+			const command = new PutObjectCommand({
+				Bucket: this.s3Config.bucketName,
+				Key: key,
+				Body: Buffer.from(await file.arrayBuffer()),
+				ContentType: file.type
+			});
+			
+			await client.send(command);
+			const imageUrl = `${this.s3Config.endpoint}/${this.s3Config.bucketName}/${key}`;
+			return `![${file.name}](${imageUrl})`;
+		} catch (error) {
+			console.error('图片上传失败:', error);
+			throw new Error('图片上传失败: ' + error.message);
+		}
+	}
+	
+	// 处理粘贴事件
+	private async handlePasteEvent(evt: ClipboardEvent, editor: Editor) {
+		// 检查粘贴内容是否包含图片
+		if (!evt.clipboardData || !evt.clipboardData.files.length) return;
+		
+		const imageFile = Array.from(evt.clipboardData.files).find(f => f.type.startsWith('image/'));
+		if (!imageFile) return;
+		
+		// 阻止默认粘贴行为
+		evt.preventDefault();
+		
+		try {
+			new Notice('正在上传图片...');
+			const markdownLink = await this.uploadImage(imageFile);
+			
+			// 替换粘贴内容为markdown链接
+			editor.replaceSelection(markdownLink);
+			new Notice('图片上传成功！');
+		} catch (error) {
+			console.error(error);
+			new Notice(`上传失败: ${error.message}`);
+			
+			// 上传失败时回退到原始粘贴
+			const reader = new FileReader();
+			reader.onload = (e) => {
+				if (e.target?.result) {
+					editor.replaceSelection(`![](${e.target.result})`);
+				}
+			};
+			reader.readAsDataURL(imageFile);
 		}
 	}
 }

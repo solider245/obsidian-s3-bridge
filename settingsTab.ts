@@ -209,10 +209,17 @@ export class MyPluginSettingTab extends PluginSettingTab {
 						
 						const getResponse = await client.send(getCommand);
 						
-						// 4. 生成图片访问URL
+						// 4. 生成图片访问URL和Markdown链接
 						const imageUrl = `${s3Config.endpoint}/${s3Config.bucketName}/${testKey}`;
+						const markdownLink = `![测试图片](${imageUrl})`;
 						
-						new Notice(`S3连接测试成功！找到 ${bucketCount} 个存储桶\n测试图片已上传到: ${imageUrl}`);
+						// 5. 复制到剪贴板
+						navigator.clipboard.writeText(markdownLink).then(() => {
+							new Notice(`S3连接测试成功！找到 ${bucketCount} 个存储桶\nMarkdown链接已复制到剪贴板: ${markdownLink}`);
+						}).catch(err => {
+							console.error('复制失败:', err);
+							new Notice(`S3连接测试成功！找到 ${bucketCount} 个存储桶\nMarkdown链接: ${markdownLink}\n(请手动复制)`);
+						});
 					} catch (error) {
 						console.error('S3连接测试失败:', error);
 						new Notice('S3连接失败: ' + error.message);
