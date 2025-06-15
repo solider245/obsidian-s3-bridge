@@ -1,5 +1,5 @@
 {
-	"id": "sample-plugin",
+	"id": "ob-s3-gemini",
 	"name": "ob-s3-gemini",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",

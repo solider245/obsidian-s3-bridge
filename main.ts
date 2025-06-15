@@ -62,10 +62,33 @@ export default class MyPlugin extends Plugin {
 	
 	// 从文件加载S3配置
 	private loadS3Config(): S3Config {
-		const configPath = path.join(this.app.vault.configDir, 'plugins/ob-s3-gemini/config/s3Config.json');
+		// 获取插件安装目录
+		const pluginFolder = `${this.app.vault.configDir}/plugins/${this.manifest.id}`;
+		console.log('插件安装目录:', pluginFolder);
 		
-		if (!fs.existsSync(configPath)) {
-			// 文件不存在时返回默认配置
+		const configPath = path.join(pluginFolder, 'config/s3Config.json');
+		console.log('加载S3配置文件:', configPath);
+		
+		try {
+			if (!fs.existsSync(configPath)) {
+				console.log('配置文件不存在，使用默认配置');
+				return {
+					endpoint: '',
+					accessKeyId: '',
+					secretAccessKey: '',
+					bucketName: '',
+					region: '',
+					useSSL: true
+				};
+			}
+			
+			const rawData = fs.readFileSync(configPath, 'utf-8');
+			const config = JSON.parse(rawData) as S3Config;
+			console.log('成功加载S3配置:', config);
+			return config;
+		} catch (error) {
+			console.error('加载S3配置失败:', error);
+			new Notice('S3配置加载失败，请检查文件格式');
 			return {
 				endpoint: '',
 				accessKeyId: '',
@@ -75,8 +98,5 @@ export default class MyPlugin extends Plugin {
 				useSSL: true
 			};
 		}
-		
-		const rawData = fs.readFileSync(configPath, 'utf-8');
-		return JSON.parse(rawData) as S3Config;
 	}
 }
