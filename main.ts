@@ -1,4 +1,5 @@
 import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { loadS3Config } from './configLoader';
 
 // Remember to rename these classes and interfaces!
 
@@ -12,9 +13,20 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
 
 export default class MyPlugin extends Plugin {
 	settings: MyPluginSettings;
+	s3Config: any; // 存储S3配置
 
 	async onload() {
 		await this.loadSettings();
+		
+		// 加载S3配置
+		try {
+			this.s3Config = loadS3Config();
+			new Notice('S3配置加载成功');
+			console.log('S3配置:', this.s3Config);
+		} catch (error) {
+			new Notice('S3配置加载失败: ' + error.message);
+			console.error('配置加载失败:', error);
+		}
 
 		// This creates an icon in the left ribbon.
 		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {

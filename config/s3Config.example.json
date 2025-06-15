@@ -1,0 +1,8 @@
+{
+  "endpoint": "",
+  "accessKeyId": "",
+  "secretAccessKey": "",
+  "bucketName": "",
+  "region": "",
+  "useSSL": true
+}

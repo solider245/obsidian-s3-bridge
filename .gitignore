@@ -20,3 +20,6 @@ data.json
 
 # Exclude macOS Finder (System Explorer) View States
 .DS_Store
+
+# Exclude sensitive S3 configuration
+/config/s3Config.json
