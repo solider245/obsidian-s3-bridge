@@ -19,8 +19,11 @@ export default class MyPlugin extends Plugin {
 		this.registerEvent(this.app.workspace.on('editor-paste', this.handlePasteEvent.bind(this)));
 
 		// 创建左侧功能区图标
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
-			new Notice('This is a notice!');
+		const ribbonIconEl = this.addRibbonIcon('dice', '打开S3插件设置', (evt: MouseEvent) => {
+			// 打开设置界面并导航到本插件的设置选项卡
+			// 注意：如果类型错误，请确保Obsidian API支持此操作
+			(this.app as any).setting?.open();
+			(this.app as any).setting?.openTabById(this.manifest.id);
 		});
 		ribbonIconEl.addClass('my-plugin-ribbon-class');
 
