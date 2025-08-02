@@ -1,4 +1,3 @@
-
 import { App, Plugin, Notice } from 'obsidian';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -32,7 +31,6 @@ function getConfigPath(plugin: Plugin): string {
  */
 export function loadS3Config(plugin: Plugin): S3Config {
   const configPath = getConfigPath(plugin);
-  console.log('加载S3配置文件:', configPath);
 
   const defaultConfig: S3Config = {
     endpoint: '',
@@ -45,7 +43,6 @@ export function loadS3Config(plugin: Plugin): S3Config {
 
   try {
     if (!fs.existsSync(configPath)) {
-      console.log('配置文件不存在，使用默认配置');
       return defaultConfig;
     }
 
@@ -54,10 +51,8 @@ export function loadS3Config(plugin: Plugin): S3Config {
       return defaultConfig;
     }
     const config = JSON.parse(rawData) as S3Config;
-    console.log('成功加载S3配置:', config);
     return { ...defaultConfig, ...config };
   } catch (error) {
-    console.error('加载S3配置失败:', error);
     new Notice('S3配置文件已损坏，将使用默认配置。请修复或删除该文件。');
     return defaultConfig;
   }
@@ -81,7 +76,6 @@ export function saveS3Config(plugin: Plugin, config: S3Config): void {
     // 写入配置文件
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
   } catch (error) {
-    console.error('保存S3配置失败:', error);
     new Notice('S3配置保存失败: ' + error.message);
   }
 }
