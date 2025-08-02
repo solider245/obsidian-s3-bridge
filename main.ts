@@ -1,143 +1,90 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin } from 'obsidian';
-import { MyPluginSettingTab, MyPluginSettings, DEFAULT_SETTINGS, S3Config } from './settingsTab';
-import * as fs from 'fs';
-import * as path from 'path';
+import { App, Editor, MarkdownView, Notice, Plugin } from 'obsidian';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { MyPluginSettingTab, MyPluginSettings, DEFAULT_SETTINGS } from './settingsTab';
+import { loadS3Config, S3Config } from './s3/s3Manager';
 
+/**
+ * 主插件类，处理S3上传的核心逻辑
+ */
 export default class MyPlugin extends Plugin {
 	settings: MyPluginSettings;
 	s3Config: S3Config;
+	private s3Client: S3Client | null;
 
+	/**
+	 * 插件加载时执行
+	 */
 	async onload() {
 		await this.loadSettings();
-		
-		// 加载S3配置
-		this.s3Config = this.loadS3Config();
-		console.log('S3配置加载成功:', this.s3Config);
-		new Notice('S3配置加载成功');
-		
+
+		// 加载S3配置并初始化客户端
+		this.reloadS3ConfigAndClient();
+
 		// 注册粘贴事件处理
 		this.registerEvent(this.app.workspace.on('editor-paste', this.handlePasteEvent.bind(this)));
 
 		// 创建左侧功能区图标
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
-			new Notice('This is a notice!');
+		this.addRibbonIcon('dice', 'S3 Image Uploader', () => {
+			new Notice('S3 Image Uploader is active!');
 		});
-		ribbonIconEl.addClass('my-plugin-ribbon-class');
 
 		// 添加状态栏项
 		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status Bar Text');
+		statusBarItemEl.setText('S3 Uploader Ready');
 
-		// 示例编辑器命令
+		// 添加上传命令
 		this.addCommand({
 			id: 'upload-image-to-s3',
-			name: '上传图片到S3',
-			editorCallback: async (editor: Editor, view: MarkdownView) => {
-				// 保存当前编辑器引用
-				const currentEditor = editor;
-				
-				// 创建文件选择输入框
-				const input = document.createElement('input');
-				input.type = 'file';
-				input.accept = 'image/*';
-				
-				input.onchange = async (e) => {
-					const file = (e.target as HTMLInputElement).files?.[0];
-					if (!file) return;
-					
-					try {
-						new Notice('正在上传图片...');
-						const markdownLink = await this.uploadImage(file);
-						
-						// 确保编辑器仍然活动
-						if (this.app.workspace.activeEditor?.editor === currentEditor) {
-							currentEditor.replaceSelection(markdownLink);
-							new Notice('图片上传成功！');
-						} else {
-							new Notice('图片上传成功！请手动粘贴链接: ' + markdownLink);
-							navigator.clipboard.writeText(markdownLink);
-						}
-					} catch (error) {
-						console.error(error);
-						new Notice(`上传失败: ${error.message}`);
-					}
-				};
-				
-				input.click();
+			name: 'Upload Image to S3',
+			editorCallback: (editor: Editor) => {
+				this.selectAndUploadImage(editor);
 			}
 		});
 
-		// 注册全局DOM事件
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			console.log('click', evt);
-		});
-
-		// 注册定时器
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
-		
 		// 添加设置面板
 		this.addSettingTab(new MyPluginSettingTab(this.app, this, this.settings));
 	}
 
+	/**
+	 * 插件卸载时执行
+	 */
 	onunload() {
-		// 清理代码
+		this.s3Client = null;
 	}
 
+	/**
+	 * 加载插件设置
+	 */
 	async loadSettings() {
-		const savedData = await this.loadData();
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, savedData);
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
 	}
 
+	/**
+	 * 保存插件设置
+	 */
 	async saveSettings() {
 		await this.saveData(this.settings);
 	}
-	
-	// 从文件加载S3配置
-	private loadS3Config(): S3Config {
-		// 获取插件安装目录
-		const pluginFolder = `${this.app.vault.configDir}/plugins/${this.manifest.id}`;
-		console.log('插件安装目录:', pluginFolder);
-		
-		const configPath = path.join(pluginFolder, 'config/s3Config.json');
-		console.log('加载S3配置文件:', configPath);
-		
-		try {
-			if (!fs.existsSync(configPath)) {
-				console.log('配置文件不存在，使用默认配置');
-				return {
-					endpoint: '',
-					accessKeyId: '',
-					secretAccessKey: '',
-					bucketName: '',
-					region: '',
-					useSSL: true
-				};
-			}
-			
-			const rawData = fs.readFileSync(configPath, 'utf-8');
-			const config = JSON.parse(rawData) as S3Config;
-			console.log('成功加载S3配置:', config);
-			return config;
-		} catch (error) {
-			console.error('加载S3配置失败:', error);
-			new Notice('S3配置加载失败，请检查文件格式');
-			return {
-				endpoint: '',
-				accessKeyId: '',
-				secretAccessKey: '',
-				bucketName: '',
-				region: '',
-				useSSL: true
-			};
-		}
+
+	/**
+	 * 重新加载S3配置并初始化客户端
+	 */
+	public reloadS3ConfigAndClient() {
+		this.s3Config = loadS3Config(this);
+		this.initializeS3Client();
 	}
-	
-	// 上传图片并返回markdown链接
-	async uploadImage(file: File): Promise<string> {
+
+	/**
+	 * 初始化S3客户端
+	 */
+	private initializeS3Client() {
+		if (!this.s3Config.endpoint || !this.s3Config.accessKeyId || !this.s3Config.secretAccessKey || !this.s3Config.bucketName) {
+			this.s3Client = null;
+			return;
+		}
+
 		try {
-			const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3');
-			
-			const client = new S3Client({
+			this.s3Client = new S3Client({
 				endpoint: this.s3Config.endpoint,
 				region: this.s3Config.region || 'us-east-1',
 				credentials: {
@@ -147,7 +94,47 @@ export default class MyPlugin extends Plugin {
 				forcePathStyle: true,
 				tls: this.s3Config.useSSL
 			});
-			
+		} catch (error) {
+			this.s3Client = null;
+			new Notice('S3 client initialization failed. Please check your settings.');
+		}
+	}
+
+	/**
+	 * 打开文件选择器并上传图片
+	 * @param editor - 当前编辑器实例
+	 */
+	private selectAndUploadImage(editor: Editor) {
+		const input = document.createElement('input');
+		input.type = 'file';
+		input.accept = 'image/*';
+		input.onchange = async (e) => {
+			const file = (e.target as HTMLInputElement).files?.[0];
+			if (!file) return;
+
+			try {
+				new Notice('Uploading image...');
+				const markdownLink = await this.uploadImage(file);
+				editor.replaceSelection(markdownLink);
+				new Notice('Image uploaded successfully!');
+			} catch (error) {
+				new Notice(`Upload failed: ${error.message}`);
+			}
+		};
+		input.click();
+	}
+
+	/**
+	 * 上传图片文件到S3并返回Markdown链接
+	 * @param file - 要上传的文件
+	 * @returns 格式化的Markdown图片链接
+	 */
+	async uploadImage(file: File): Promise<string> {
+		if (!this.s3Client) {
+			throw new Error('S3 client is not initialized. Please check your settings.');
+		}
+
+		try {
 			const key = `images/${Date.now()}_${file.name}`;
 			const command = new PutObjectCommand({
 				Bucket: this.s3Config.bucketName,
@@ -155,39 +142,36 @@ export default class MyPlugin extends Plugin {
 				Body: Buffer.from(await file.arrayBuffer()),
 				ContentType: file.type
 			});
-			
-			await client.send(command);
+
+			await this.s3Client.send(command);
 			const imageUrl = `${this.s3Config.endpoint}/${this.s3Config.bucketName}/${key}`;
 			return `![${file.name}](${imageUrl})`;
 		} catch (error) {
-			console.error('图片上传失败:', error);
-			throw new Error('图片上传失败: ' + error.message);
+			throw new Error(`Image upload failed: ${error.message}`);
 		}
 	}
-	
-	// 处理粘贴事件
+
+	/**
+	 * 处理编辑器的粘贴事件
+	 * @param evt - 剪贴板事件
+	 * @param editor - 当前编辑器实例
+	 */
 	private async handlePasteEvent(evt: ClipboardEvent, editor: Editor) {
-		// 检查粘贴内容是否包含图片
 		if (!evt.clipboardData || !evt.clipboardData.files.length) return;
-		
+
 		const imageFile = Array.from(evt.clipboardData.files).find(f => f.type.startsWith('image/'));
 		if (!imageFile) return;
-		
-		// 阻止默认粘贴行为
+
 		evt.preventDefault();
-		
+
 		try {
-			new Notice('正在上传图片...');
+			new Notice('Uploading image...');
 			const markdownLink = await this.uploadImage(imageFile);
-			
-			// 替换粘贴内容为markdown链接
 			editor.replaceSelection(markdownLink);
-			new Notice('图片上传成功！');
+			new Notice('Image uploaded successfully!');
 		} catch (error) {
-			console.error(error);
-			new Notice(`上传失败: ${error.message}`);
-			
-			// 上传失败时回退到原始粘贴
+			new Notice(`Upload failed: ${error.message}`);
+			// Fallback to default paste behavior if upload fails
 			const reader = new FileReader();
 			reader.onload = (e) => {
 				if (e.target?.result) {

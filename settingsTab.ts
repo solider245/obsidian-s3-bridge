@@ -1,229 +1,180 @@
-import { App, Plugin, PluginSettingTab, Setting, Notice } from 'obsidian';
-import * as fs from 'fs';
-import * as path from 'path';
+import MyPlugin from './main';
+import { App, PluginSettingTab, Setting, Notice } from 'obsidian';
+import { S3Config, loadS3Config, saveS3Config } from './s3/s3Manager';
 
-export interface S3Config {
-  endpoint: string;
-  accessKeyId: string;
-  secretAccessKey: string;
-  bucketName: string;
-  region?: string;
-  useSSL: boolean;
-}
-
+/**
+ * 插件的基础设置接口
+ */
 export interface MyPluginSettings {
 	mySetting: string;
 }
 
+/**
+ * 默认的基础设置
+ */
 export const DEFAULT_SETTINGS: MyPluginSettings = {
 	mySetting: 'default'
 }
 
+/**
+ * 插件的设置面板
+ */
 export class MyPluginSettingTab extends PluginSettingTab {
-	plugin: Plugin;
-	settings: MyPluginSettings;
+	plugin: MyPlugin;
+	private s3Config: S3Config;
 
-	constructor(app: App, plugin: Plugin, settings: MyPluginSettings) {
+	constructor(app: App, plugin: MyPlugin, settings: MyPluginSettings) {
 		super(app, plugin);
 		this.plugin = plugin;
-		this.settings = settings;
+		this.s3Config = loadS3Config(this.plugin);
 	}
 
-	// 保存S3配置到文件
-	private saveS3Config(config: S3Config) {
-		// 获取插件安装目录
-		const pluginFolder = `${this.plugin.app.vault.configDir}/plugins/${this.plugin.manifest.id}`;
-		const configPath = path.join(pluginFolder, 'config/s3Config.json');
-		const configDir = path.dirname(configPath);
-		
-		// 确保目录存在
-		if (!fs.existsSync(configDir)) {
-			fs.mkdirSync(configDir, { recursive: true });
-		}
-		
-		// 写入配置文件
-		fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
-	}
-
-	// 从文件加载S3配置
-	private loadS3Config(): S3Config {
-		// 获取插件安装目录
-		const pluginFolder = `${this.plugin.app.vault.configDir}/plugins/${this.plugin.manifest.id}`;
-		const configPath = path.join(pluginFolder, 'config/s3Config.json');
-		
-		if (!fs.existsSync(configPath)) {
-			// 文件不存在时返回默认配置
-			return {
-				endpoint: '',
-				accessKeyId: '',
-				secretAccessKey: '',
-				bucketName: '',
-				region: '',
-				useSSL: true
-			};
-		}
-		
-		const rawData = fs.readFileSync(configPath, 'utf-8');
-		return JSON.parse(rawData) as S3Config;
-	}
-
+	/**
+	 * 显示设置面板
+	 */
 	display(): void {
 		const { containerEl } = this;
 
 		containerEl.empty();
 
-		// 加载当前S3配置
-		const s3Config = this.loadS3Config();
-
-		// 原有设置项
-		new Setting(containerEl)
-			.setName('基础设置')
-			.setDesc('插件基础配置')
-			.addText(text => text
-				.setPlaceholder('输入配置值')
-				.setValue(this.settings.mySetting)
-				.onChange(async (value) => {
-					this.settings.mySetting = value;
-					await this.plugin.saveData(this.settings);
-				}));
+		containerEl.createEl('h2', { text: 'S3 Image Uploader Settings' });
 
 		// S3 配置区域
-		containerEl.createEl('h2', { text: 'S3 对象存储配置' });
-
 		new Setting(containerEl)
 			.setName('Endpoint')
-			.setDesc('S3 兼容服务端点')
+			.setDesc('S3 compatible endpoint')
 			.addText(text => text
 				.setPlaceholder('https://your-s3-endpoint.com')
-				.setValue(s3Config.endpoint)
-				.onChange(async (value) => {
-					s3Config.endpoint = value;
-					this.saveS3Config(s3Config);
+				.setValue(this.s3Config.endpoint)
+				.onChange((value) => {
+					this.s3Config.endpoint = value;
 				}));
 
 		new Setting(containerEl)
 			.setName('Access Key ID')
-			.setDesc('S3 访问密钥 ID')
+			.setDesc('S3 access key ID')
 			.addText(text => text
 				.setPlaceholder('your-access-key-id')
-				.setValue(s3Config.accessKeyId)
-				.onChange(async (value) => {
-					s3Config.accessKeyId = value;
-					this.saveS3Config(s3Config);
+				.setValue(this.s3Config.accessKeyId)
+				.onChange((value) => {
+					this.s3Config.accessKeyId = value;
 				}));
 
 		new Setting(containerEl)
 			.setName('Secret Access Key')
-			.setDesc('S3 秘密访问密钥')
+			.setDesc('S3 secret access key')
 			.addText(text => text
 				.setPlaceholder('your-secret-access-key')
-				.setValue(s3Config.secretAccessKey)
-				.onChange(async (value) => {
-					s3Config.secretAccessKey = value;
-					this.saveS3Config(s3Config);
+				.setValue(this.s3Config.secretAccessKey)
+				.onChange((value) => {
+					this.s3Config.secretAccessKey = value;
 				}));
 
 		new Setting(containerEl)
 			.setName('Bucket Name')
-			.setDesc('存储桶名称')
+			.setDesc('S3 bucket name')
 			.addText(text => text
 				.setPlaceholder('your-bucket-name')
-				.setValue(s3Config.bucketName)
-				.onChange(async (value) => {
-					s3Config.bucketName = value;
-					this.saveS3Config(s3Config);
+				.setValue(this.s3Config.bucketName)
+				.onChange((value) => {
+					this.s3Config.bucketName = value;
 				}));
 
 		new Setting(containerEl)
 			.setName('Region')
-			.setDesc('区域（可选）')
+			.setDesc('S3 region (optional)')
 			.addText(text => text
 				.setPlaceholder('optional-region')
-				.setValue(s3Config.region || '')
-				.onChange(async (value) => {
-					s3Config.region = value;
-					this.saveS3Config(s3Config);
+				.setValue(this.s3Config.region || '')
+				.onChange((value) => {
+					this.s3Config.region = value;
 				}));
 
 		new Setting(containerEl)
-			.setName('使用 SSL')
-			.setDesc('是否启用 SSL 连接')
+			.setName('Use SSL')
+			.setDesc('Use SSL for S3 connection')
 			.addToggle(toggle => toggle
-				.setValue(s3Config.useSSL)
-				.onChange(async (value) => {
-					s3Config.useSSL = value;
-					this.saveS3Config(s3Config);
+				.setValue(this.s3Config.useSSL)
+				.onChange((value) => {
+					this.s3Config.useSSL = value;
 				}));
-		
-		// 添加测试连接按钮
+
+		// 操作按钮
 		new Setting(containerEl)
-			.setName('测试连接')
-			.setDesc('测试S3服务连接')
+			.setName('Actions')
+			.setDesc('Save settings and test connection')
 			.addButton(button => button
-				.setButtonText('测试连接')
+				.setButtonText('Save and Reload')
+				.setCta()
+				.onClick(() => {
+					saveS3Config(this.plugin, this.s3Config);
+					this.plugin.reloadS3ConfigAndClient();
+					new Notice('Settings saved and reloaded.');
+				}))
+			.addButton(button => button
+				.setButtonText('Test Connection')
 				.onClick(async () => {
-					new Notice('正在测试S3连接...');
-					try {
-						// 使用S3配置创建客户端
-						const { S3Client, ListBucketsCommand, PutObjectCommand, GetObjectCommand } = await import('@aws-sdk/client-s3');
-						
-						const client = new S3Client({
-							endpoint: s3Config.endpoint,
-							region: s3Config.region || 'us-east-1',
-							credentials: {
-								accessKeyId: s3Config.accessKeyId,
-								secretAccessKey: s3Config.secretAccessKey
-							},
-							forcePathStyle: true, // 对于MinIO等S3兼容服务需要
-							tls: s3Config.useSSL
-						});
-						
-						// 1. 测试列出存储桶
-						const listCommand = new ListBucketsCommand({});
-						const listResponse = await client.send(listCommand);
-						const bucketCount = listResponse.Buckets?.length || 0;
-						
-						// 2. 上传测试图片
-						if (!s3Config.bucketName) {
-							new Notice('未配置存储桶名称，跳过图片上传测试');
-							return;
-						}
-						
-						const testKey = 'obsidian-test-image.png';
-						const testImage = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
-						
-						const putCommand = new PutObjectCommand({
-							Bucket: s3Config.bucketName,
-							Key: testKey,
-							Body: testImage,
-							ContentType: 'image/png'
-						});
-						
-						await client.send(putCommand);
-						
-						// 3. 验证图片存在
-						const getCommand = new GetObjectCommand({
-							Bucket: s3Config.bucketName,
-							Key: testKey
-						});
-						
-						const getResponse = await client.send(getCommand);
-						
-						// 4. 生成图片访问URL和Markdown链接
-						const imageUrl = `${s3Config.endpoint}/${s3Config.bucketName}/${testKey}`;
-						const markdownLink = `![测试图片](${imageUrl})`;
-						
-						// 5. 复制到剪贴板
-						navigator.clipboard.writeText(markdownLink).then(() => {
-							new Notice(`S3连接测试成功！找到 ${bucketCount} 个存储桶\nMarkdown链接已复制到剪贴板: ${markdownLink}`);
-						}).catch(err => {
-							console.error('复制失败:', err);
-							new Notice(`S3连接测试成功！找到 ${bucketCount} 个存储桶\nMarkdown链接: ${markdownLink}\n(请手动复制)`);
-						});
-					} catch (error) {
-						console.error('S3连接测试失败:', error);
-						new Notice('S3连接失败: ' + error.message);
-					}
+					this.testS3Connection();
 				}));
+	}
+
+	/**
+	 * 测试S3连接
+	 */
+	private async testS3Connection() {
+		new Notice('Testing S3 connection...');
+		try {
+			const { S3Client, ListBucketsCommand, PutObjectCommand, GetObjectCommand } = await import('@aws-sdk/client-s3');
+
+			const client = new S3Client({
+				endpoint: this.s3Config.endpoint,
+				region: this.s3Config.region || 'us-east-1',
+				credentials: {
+					accessKeyId: this.s3Config.accessKeyId,
+					secretAccessKey: this.s3Config.secretAccessKey
+				},
+				forcePathStyle: true,
+				tls: this.s3Config.useSSL
+			});
+
+			const listCommand = new ListBucketsCommand({});
+			const listResponse = await client.send(listCommand);
+			const bucketCount = listResponse.Buckets?.length || 0;
+
+			if (!this.s3Config.bucketName) {
+				new Notice(`Found ${bucketCount} buckets. Bucket name is not configured, skipping upload test.`);
+				return;
+			}
+
+			const testKey = 'obsidian-test-image.png';
+			const testImage = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+
+			const putCommand = new PutObjectCommand({
+				Bucket: this.s3Config.bucketName,
+				Key: testKey,
+				Body: testImage,
+				ContentType: 'image/png'
+			});
+
+			await client.send(putCommand);
+
+			const getCommand = new GetObjectCommand({
+				Bucket: this.s3Config.bucketName,
+				Key: testKey
+			});
+
+			await client.send(getCommand);
+
+			const imageUrl = `${this.s3Config.endpoint}/${this.s3Config.bucketName}/${testKey}`;
+			const markdownLink = `![Test Image](${imageUrl})`;
+
+			navigator.clipboard.writeText(markdownLink).then(() => {
+				new Notice(`S3 connection successful! Found ${bucketCount} buckets. Test image link copied to clipboard.`);
+			}).catch(() => {
+				new Notice(`S3 connection successful! Markdown link: ${markdownLink}`);
+			});
+		} catch (error) {
+			new Notice(`S3 connection failed: ${error.message}`);
+		}
 	}
 }
