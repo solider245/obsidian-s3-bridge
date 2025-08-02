@@ -145,6 +145,53 @@ export class MyPluginSettingTab extends PluginSettingTab {
             this.plugin.reloadS3ConfigAndClient();
             new Notice('S3 settings saved');
           }),
+      )
+      .addButton(btn =>
+        btn
+          .setButtonText('Test Connection')
+          .onClick(async () => {
+            // 连接测试：上传测试文件并在成功后删除
+            const plugin = this.plugin;
+            const cfg = loadS3Config(plugin);
+            plugin.reloadS3ConfigAndClient();
+            if (!plugin['s3Client']) {
+              new Notice('S3 client is not initialized. Please check your settings.');
+              return;
+            }
+            const { S3Client, PutObjectCommand, DeleteObjectCommand } = await import('@aws-sdk/client-s3');
+
+            // 组装测试对象 Key，复用 keyPrefix
+            const safePrefix = (cfg.keyPrefix ?? '').replace(/^\/+/, '').replace(/\/+$/,'');
+            const prefixWithSlash = safePrefix ? `${safePrefix}/` : '';
+            const testKey = `${prefixWithSlash}obsidian-test-image.png`;
+
+            // 构造极小体积的PNG文件字节流(1x1像素)
+            const tinyPngBase64 =
+              'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAOQy5CwAAAAASUVORK5CYII=';
+            const testBody = Buffer.from(tinyPngBase64, 'base64');
+
+            try {
+              // 上传
+              const put = new PutObjectCommand({
+                Bucket: cfg.bucketName,
+                Key: testKey,
+                Body: testBody,
+                ContentType: 'image/png',
+              });
+              await plugin['s3Client'].send(put);
+
+              // 删除
+              const del = new DeleteObjectCommand({
+                Bucket: cfg.bucketName,
+                Key: testKey,
+              });
+              await plugin['s3Client'].send(del);
+
+              new Notice('S3 connection test succeeded and test file was cleaned up');
+            } catch (error) {
+              new Notice('S3 connection test failed: ' + (error as Error).message);
+            }
+          }),
       );
 
     // Upload History
