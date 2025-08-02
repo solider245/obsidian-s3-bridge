@@ -11,6 +11,7 @@ export interface S3Config {
   secretAccessKey: string;
   bucketName: string;
   region?: string;
+  keyPrefix?: string;
   useSSL: boolean;
 }
 
@@ -38,7 +39,8 @@ export function loadS3Config(plugin: Plugin): S3Config {
     secretAccessKey: '',
     bucketName: '',
     region: '',
-    useSSL: true
+    useSSL: true,
+    keyPrefix: ''
   };
 
   try {
@@ -50,8 +52,9 @@ export function loadS3Config(plugin: Plugin): S3Config {
     if (!rawData) {
       return defaultConfig;
     }
-    const config = JSON.parse(rawData) as S3Config;
-    return { ...defaultConfig, ...config };
+    const config = JSON.parse(rawData) as Partial<S3Config>;
+    // 兼容旧版本配置文件：若不存在 keyPrefix 则回落为空字符串
+    return { ...defaultConfig, ...config, keyPrefix: config.keyPrefix ?? '' };
   } catch (error) {
     new Notice('S3配置文件已损坏，将使用默认配置。请修复或删除该文件。');
     return defaultConfig;
@@ -73,9 +76,20 @@ export function saveS3Config(plugin: Plugin, config: S3Config): void {
       fs.mkdirSync(configDir, { recursive: true });
     }
 
+    // 规范化并确保 keyPrefix 字段存在，向后兼容
+    const normalized: S3Config = {
+      endpoint: config.endpoint ?? '',
+      accessKeyId: config.accessKeyId ?? '',
+      secretAccessKey: config.secretAccessKey ?? '',
+      bucketName: config.bucketName ?? '',
+      region: config.region ?? '',
+      useSSL: config.useSSL ?? true,
+      keyPrefix: config.keyPrefix ?? ''
+    };
+
     // 写入配置文件
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+    fs.writeFileSync(configPath, JSON.stringify(normalized, null, 2), 'utf-8');
   } catch (error) {
-    new Notice('S3配置保存失败: ' + error.message);
+    new Notice('S3配置保存失败: ' + (error as Error).message);
   }
 }

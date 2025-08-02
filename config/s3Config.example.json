@@ -4,5 +4,6 @@
   "secretAccessKey": "",
   "bucketName": "",
   "region": "",
-  "useSSL": true
+  "useSSL": true,
+  "keyPrefix": ""
 }
