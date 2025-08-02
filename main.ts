@@ -135,7 +135,11 @@ export default class MyPlugin extends Plugin {
 		}
 
 		try {
-			const key = `images/${Date.now()}_${file.name}`;
+			// 使用设置中的 keyPrefix 作为对象键前缀
+			const safePrefix = (this.s3Config.keyPrefix ?? '').replace(/^\/+/, '').replace(/\/+$/,'');
+			const prefixWithSlash = safePrefix ? `${safePrefix}/` : '';
+			const key = `${prefixWithSlash}${Date.now()}_${file.name}`;
+
 			const command = new PutObjectCommand({
 				Bucket: this.s3Config.bucketName,
 				Key: key,
@@ -145,9 +149,44 @@ export default class MyPlugin extends Plugin {
 
 			await this.s3Client.send(command);
 			const imageUrl = `${this.s3Config.endpoint}/${this.s3Config.bucketName}/${key}`;
+
+			// 记录上传历史
+			try {
+				const historyRaw = localStorage.getItem('obS3Uploader.history') ?? '[]';
+				const history = JSON.parse(historyRaw) as Array<{
+					fileName: string; key: string; url: string; time: number; contentType: string;
+				}>;
+				const entry = {
+					fileName: file.name,
+					key,
+					url: imageUrl,
+					time: Date.now(),
+					contentType: file.type
+				};
+				history.unshift(entry);
+				// 限制历史最多保存 50 条
+				const limited = history.slice(0, 50);
+				localStorage.setItem('obS3Uploader.history', JSON.stringify(limited));
+			} catch (e) {
+				console.warn('Failed to persist upload history', e);
+			}
+
 			return `![${file.name}](${imageUrl})`;
 		} catch (error) {
-			throw new Error(`Image upload failed: ${error.message}`);
+			// 失败也记录一条错误提示，便于在历史面板看到失败尝试
+			try {
+				const historyRaw = localStorage.getItem('obS3Uploader.history') ?? '[]';
+				const history = JSON.parse(historyRaw) as any[];
+				history.unshift({
+					fileName: file.name,
+					key: null,
+					url: null,
+					time: Date.now(),
+					error: (error as Error).message
+				});
+				localStorage.setItem('obS3Uploader.history', JSON.stringify(history.slice(0, 50)));
+			} catch {}
+			throw new Error(`Image upload failed: ${(error as Error).message}`);
 		}
 	}
 

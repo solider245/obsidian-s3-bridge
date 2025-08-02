@@ -8,6 +8,22 @@ export interface MyPluginSettings {
 
 export const DEFAULT_SETTINGS: MyPluginSettings = {};
 
+function readHistory(): any[] {
+  try {
+    const raw = localStorage.getItem('obS3Uploader.history') ?? '[]';
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeHistory(arr: any[]) {
+  try {
+    localStorage.setItem('obS3Uploader.history', JSON.stringify(arr.slice(0, 50)));
+  } catch {}
+}
+
 export class MyPluginSettingTab extends PluginSettingTab {
   plugin: MyPlugin;
 
@@ -130,5 +146,76 @@ export class MyPluginSettingTab extends PluginSettingTab {
             new Notice('S3 settings saved');
           }),
       );
+
+    // Upload History
+    containerEl.createEl('h3', { text: 'Upload History' });
+
+    const historyContainer = containerEl.createDiv({ cls: 'ob-s3-history' });
+
+    const renderHistory = () => {
+      historyContainer.empty();
+      const history = readHistory();
+
+      if (!history.length) {
+        historyContainer.createEl('div', { text: 'No upload history yet.' });
+        return;
+      }
+
+      // 操作按钮行
+      const ops = historyContainer.createDiv({ cls: 'ob-s3-history-ops' });
+      const btnCopyAll = ops.createEl('button', { text: 'Copy All Links' });
+      const btnClear = ops.createEl('button', { text: 'Clear History' });
+
+      btnCopyAll.onclick = async () => {
+        const links = history
+          .filter((e: any) => e.url)
+          .map((e: any) => e.url)
+          .join('\n');
+        if (!links) {
+          new Notice('No successful uploads to copy.');
+          return;
+        }
+        await navigator.clipboard.writeText(links);
+        new Notice('All links copied to clipboard');
+      };
+
+      btnClear.onclick = () => {
+        writeHistory([]);
+        renderHistory();
+        new Notice('Upload history cleared');
+      };
+
+      // 列表
+      const list = historyContainer.createEl('div', { cls: 'ob-s3-history-list' });
+
+      history.slice(0, 50).forEach((item: any) => {
+        const row = list.createEl('div', { cls: 'ob-s3-history-row' });
+
+        const meta = row.createEl('div', { cls: 'ob-s3-history-meta' });
+        const time = new Date(item.time ?? Date.now()).toLocaleString();
+        meta.createEl('div', { text: item.fileName ?? '(unknown file)' });
+        meta.createEl('div', { text: item.key ? `Key: ${item.key}` : 'Key: -' });
+        meta.createEl('div', { text: `Time: ${time}` });
+
+        if (item.error) {
+          // 失败条目
+          const err = row.createEl('div', { cls: 'ob-s3-history-error' });
+          err.createEl('span', { text: `Error: ${item.error}` });
+        } else {
+          // 成功条目
+          const linkWrap = row.createEl('div', { cls: 'ob-s3-history-link' });
+          const a = linkWrap.createEl('a', { text: item.url, href: item.url });
+          a.target = '_blank';
+
+          const btnCopy = linkWrap.createEl('button', { text: 'Copy' });
+          btnCopy.onclick = async () => {
+            await navigator.clipboard.writeText(item.url);
+            new Notice('Link copied');
+          };
+        }
+      });
+    };
+
+    renderHistory();
   }
 }
