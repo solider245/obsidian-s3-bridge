@@ -6,13 +6,14 @@ import * as path from 'path';
  * S3 配置接口
  */
 export interface S3Config {
-  endpoint: string;
+  endpoint: string;            // API 端点（用于签名/SDK）
   accessKeyId: string;
   secretAccessKey: string;
   bucketName: string;
   region?: string;
   keyPrefix?: string;
   useSSL: boolean;
+  baseUrl?: string;            // 新增：公共访问域名，仅用于返回/预览链接（如 https://bucket.r2.dev 或自定义域）
 }
 
 /**
@@ -40,7 +41,8 @@ export function loadS3Config(plugin: Plugin): S3Config {
     bucketName: '',
     region: '',
     useSSL: true,
-    keyPrefix: ''
+    keyPrefix: '',
+    baseUrl: ''
   };
 
   try {
@@ -53,8 +55,8 @@ export function loadS3Config(plugin: Plugin): S3Config {
       return defaultConfig;
     }
     const config = JSON.parse(rawData) as Partial<S3Config>;
-    // 兼容旧版本配置文件：若不存在 keyPrefix 则回落为空字符串
-    return { ...defaultConfig, ...config, keyPrefix: config.keyPrefix ?? '' };
+    // 兼容旧版本配置文件：若不存在 keyPrefix/baseUrl 则回落为空字符串
+    return { ...defaultConfig, ...config, keyPrefix: config.keyPrefix ?? '', baseUrl: (config as any).baseUrl ?? '' };
   } catch (error) {
     new Notice('S3配置文件已损坏，将使用默认配置。请修复或删除该文件。');
     return defaultConfig;
@@ -76,7 +78,7 @@ export function saveS3Config(plugin: Plugin, config: S3Config): void {
       fs.mkdirSync(configDir, { recursive: true });
     }
 
-    // 规范化并确保 keyPrefix 字段存在，向后兼容
+    // 规范化并确保 keyPrefix/baseUrl 字段存在，向后兼容
     const normalized: S3Config = {
       endpoint: config.endpoint ?? '',
       accessKeyId: config.accessKeyId ?? '',
@@ -84,7 +86,8 @@ export function saveS3Config(plugin: Plugin, config: S3Config): void {
       bucketName: config.bucketName ?? '',
       region: config.region ?? '',
       useSSL: config.useSSL ?? true,
-      keyPrefix: config.keyPrefix ?? ''
+      keyPrefix: config.keyPrefix ?? '',
+      baseUrl: (config as any).baseUrl ?? ''
     };
 
     // 写入配置文件

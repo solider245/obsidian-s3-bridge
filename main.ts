@@ -1,7 +1,11 @@
 import { App, Editor, MarkdownView, Notice, Plugin } from 'obsidian';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { MyPluginSettingTab, MyPluginSettings, DEFAULT_SETTINGS } from './settingsTab';
 import { loadS3Config, S3Config } from './s3/s3Manager';
+// 静态导入主进程上传器，避免动态 import 导致的模块缓存/加载时序问题
+import * as S3Uploader from './src/uploader/s3Uploader';
+// 预签名 PUT 实现
+import { presignAndPutObject, testConnectionViaPresign } from './src/uploader/presignPut';
 
 /**
  * 主插件类，处理S3上传的核心逻辑
@@ -130,25 +134,32 @@ export default class MyPlugin extends Plugin {
 	 * @returns 格式化的Markdown图片链接
 	 */
 	async uploadImage(file: File): Promise<string> {
-		if (!this.s3Client) {
-			throw new Error('S3 client is not initialized. Please check your settings.');
-		}
+		// 改为主进程预签名 PUT，渲染端不直连 R2，彻底规避 CORS
+		// 构造对象键
+		const safePrefix = (this.s3Config.keyPrefix ?? '').replace(/^\/+/, '').replace(/\/+$/,'');
+		const prefixWithSlash = safePrefix ? `${safePrefix}/` : '';
+		const key = `${prefixWithSlash}${Date.now()}_${file.name}`;
+
+		const bodyBase64 = Buffer.from(await file.arrayBuffer()).toString('base64');
 
 		try {
-			// 使用设置中的 keyPrefix 作为对象键前缀
-			const safePrefix = (this.s3Config.keyPrefix ?? '').replace(/^\/+/, '').replace(/\/+$/,'');
-			const prefixWithSlash = safePrefix ? `${safePrefix}/` : '';
-			const key = `${prefixWithSlash}${Date.now()}_${file.name}`;
-
-			const command = new PutObjectCommand({
-				Bucket: this.s3Config.bucketName,
-				Key: key,
-				Body: Buffer.from(await file.arrayBuffer()),
-				ContentType: file.type
+			await presignAndPutObject(this, {
+				key,
+				contentType: file.type || 'application/octet-stream',
+				bodyBase64,
 			});
 
-			await this.s3Client.send(command);
-			const imageUrl = `${this.s3Config.endpoint}/${this.s3Config.bucketName}/${key}`;
+			// 生成访问 URL：
+			// 优先使用配置的公共 Base URL（供浏览器访问，如 https://bucket.r2.dev 或自定义域）
+			// 若未配置，则回退为 API endpoint 的 path-style，但可能无法直连访问（仅用于占位/调试）
+			const base = (this.s3Config as any).baseUrl?.trim();
+			let imageUrl: string;
+			if (base) {
+			  imageUrl = `${base.replace(/\/+$/,'')}/${key}`;
+			} else {
+			  imageUrl = `${(this.s3Config.endpoint || '').replace(/\/+$/,'')}/${this.s3Config.bucketName}/${key}`;
+			  console.warn('[ob-s3-gemini] No Public Base URL configured; generated path-style URL may not be publicly accessible. Configure Public Base URL for proper preview.');
+			}
 
 			// 记录上传历史
 			try {
@@ -164,16 +175,13 @@ export default class MyPlugin extends Plugin {
 					contentType: file.type
 				};
 				history.unshift(entry);
-				// 限制历史最多保存 50 条
-				const limited = history.slice(0, 50);
-				localStorage.setItem('obS3Uploader.history', JSON.stringify(limited));
+				localStorage.setItem('obS3Uploader.history', JSON.stringify(history.slice(0, 50)));
 			} catch (e) {
 				console.warn('Failed to persist upload history', e);
 			}
 
 			return `![${file.name}](${imageUrl})`;
 		} catch (error) {
-			// 失败也记录一条错误提示，便于在历史面板看到失败尝试
 			try {
 				const historyRaw = localStorage.getItem('obS3Uploader.history') ?? '[]';
 				const history = JSON.parse(historyRaw) as any[];
@@ -220,4 +228,27 @@ export default class MyPlugin extends Plugin {
 			reader.readAsDataURL(imageFile);
 		}
 	}
+}
+
+// 顶层唯一导出：主进程通道 Test Connection（PUT 后立刻 DELETE）
+/**
+ * 预签名方案：测试连通性，主进程生成 Presigned URL 并由主进程 PUT，再使用 SDK DELETE 清理
+ */
+export async function testS3ConnectionViaPresign(
+  plugin: MyPlugin,
+  opts: { key: string; contentType: string; bodyBase64: string }
+): Promise<void> {
+  // eslint-disable-next-line no-console
+  console.info('[ob-s3-gemini] preparing to use main channel presign+PUT');
+  await testConnectionViaPresign(plugin, opts);
+}
+
+/**
+ * 兼容导出：保留旧名，内部重定向到预签名方案，避免外部调用方变更
+ */
+export async function testS3ConnectionViaMainUsingUploader(
+  plugin: MyPlugin,
+  opts: { key: string; contentType: string; bodyBase64: string }
+): Promise<void> {
+  return testS3ConnectionViaPresign(plugin, opts);
 }
