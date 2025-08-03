@@ -64,5 +64,12 @@
   "Time": "时间",
   "Error": "错误",
   "Copy": "复制",
-  "Link copied": "链接已复制"
+  "Link copied": "链接已复制",
+
+  "Basic Settings": "基础配置",
+  "Connection Test": "连接测试",
+  "Advanced": "高级选项",
+  "Upload History (click to expand)": "上传历史（点击展开）",
+  "Only keep essential actions here": "此处仅保留必要操作",
+  "Provider advanced options will appear here.": "提供商的高级选项将显示在此处。"
 }

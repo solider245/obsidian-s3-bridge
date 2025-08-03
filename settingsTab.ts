@@ -335,21 +335,52 @@ export class MyPluginSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
+    // 单页：基础设置 + 折叠分区（连接测试、上传历史、高级选项）
+    // 基础设置
     this.renderProfilesSection(containerEl);
-    // 每次渲染时同步 window 上的阈值
     try {
       const activeNow = loadActiveProfile(this.plugin) as any;
       (window as any).__obS3_maxUploadMB__ = Number.isFinite(activeNow?.maxUploadMB) && activeNow?.maxUploadMB > 0
         ? Math.floor(activeNow.maxUploadMB)
         : 5;
     } catch { /* noop */ }
-    // 标题在 renderProfileForm 内创建
     this.renderProfileForm(containerEl);
 
-    // 历史记录区块
-    containerEl.createEl('h3', { text: t('Upload History') });
-    const historyContainer = containerEl.createDiv({ cls: 'ob-s3-history' });
+    // 连接测试（折叠，可选默认展开：这里选择默认展开，便于快速测试）
+    const testDetails = containerEl.createEl('details', { cls: 'ob-s3-fold ob-s3-fold-test' });
+    const testFoldKey = 'obS3Uploader.fold.test';
+    const testSaved = localStorage.getItem(testFoldKey);
+    testDetails.open = testSaved !== 'closed'; // 默认展开
+    testDetails.addEventListener('toggle', () => {
+      localStorage.setItem(testFoldKey, testDetails.open ? 'open' : 'closed');
+    });
+    testDetails.createEl('summary', { text: t('Connection Test') });
 
+    const testWrap = testDetails.createDiv({ cls: 'ob-s3-test-wrap' });
+    const actions = new Setting(testWrap)
+      .setName(t('Connection Test'))
+      .setDesc(t('Only keep essential actions here') || '');
+    actions.addButton(btn => {
+      btn.setButtonText(t('Test Connection')).onClick(async (evt) => {
+        try {
+          this.app.workspace.trigger('execute-command', { id: 'obs3gemini-test-connection' } as any);
+        } catch (error) {
+          new Notice(tp('Connection test failed: {error}', { error: (error as Error).message }));
+        }
+      });
+    });
+
+    // 上传历史（默认折叠，带记忆）
+    const historyDetails = containerEl.createEl('details', { cls: 'ob-s3-fold ob-s3-fold-history' });
+    const foldKey = 'obS3Uploader.history.fold';
+    const saved = localStorage.getItem(foldKey);
+    historyDetails.open = saved === 'open';
+    historyDetails.addEventListener('toggle', () => {
+      localStorage.setItem(foldKey, historyDetails.open ? 'open' : 'closed');
+    });
+    historyDetails.createEl('summary', { text: t('Upload History (click to expand)') });
+
+    const historyContainer = historyDetails.createDiv({ cls: 'ob-s3-history' });
     const renderHistory = () => {
       historyContainer.empty();
       const history = readHistory();
@@ -359,7 +390,6 @@ export class MyPluginSettingTab extends PluginSettingTab {
         return;
       }
 
-      // 操作按钮行
       const ops = historyContainer.createDiv({ cls: 'ob-s3-history-ops' });
       const btnCopyAll = ops.createEl('button', { text: t('Copy All Links') });
       const btnClear = ops.createEl('button', { text: t('Clear History') });
@@ -387,7 +417,6 @@ export class MyPluginSettingTab extends PluginSettingTab {
         new Notice(t('Upload history cleared'));
       };
 
-      // 列表
       const list = historyContainer.createEl('div', { cls: 'ob-s3-history-list' });
 
       history.slice(0, 50).forEach((item: any) => {
@@ -415,8 +444,17 @@ export class MyPluginSettingTab extends PluginSettingTab {
         }
       });
     };
-
-    this.renderActions(containerEl);
     renderHistory();
+
+    // 高级选项（默认折叠，先放说明；后续可把更高级字段搬过来或仅作为说明）
+    const advancedDetails = containerEl.createEl('details', { cls: 'ob-s3-fold ob-s3-fold-advanced' });
+    const advFoldKey = 'obS3Uploader.fold.advanced';
+    const advSaved = localStorage.getItem(advFoldKey);
+    advancedDetails.open = advSaved === 'open' ? true : false;
+    advancedDetails.addEventListener('toggle', () => {
+      localStorage.setItem(advFoldKey, advancedDetails.open ? 'open' : 'closed');
+    });
+    advancedDetails.createEl('summary', { text: t('Advanced') });
+    advancedDetails.createEl('div', { text: t('Provider advanced options will appear here.') });
   }
 }

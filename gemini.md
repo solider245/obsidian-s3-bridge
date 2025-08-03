@@ -44,6 +44,22 @@
 
 8.  UI/UX 分组优化
     - 设置面板分 Tab：基础配置、连接测试、上传历史、高级选项。
+    - 交互细节（与用户确认版）：
+      - 基础配置
+        - 配置选择与增删改：选择配置、新增、删除、配置名称、服务类型
+        - Provider 字段：endpoint、bucketName、accessKeyId、secretAccessKey、region、useSSL
+        - 上传相关：最大上传大小（MB）
+      - 连接测试
+        - “测试连接”按钮与结果提示（仅保留此区功能，说明文案简洁）
+      - 上传历史
+        - 整块默认折叠，可展开查看；包含“复制全部链接”“清空历史”按钮与列表
+      - 高级选项
+        - keyPrefix、baseUrl、path-style 或等价开关（不同 Provider 的进阶选项放这里）
+    - 技术实现要点：
+      - 在 [`settingsTab.display()`](settingsTab.ts:334) 将单页渲染拆分为四个子容器，使用 Tab 栏或 Segment 控件切换
+      - “上传历史”块使用 details/summary 或自定义折叠逻辑（默认折叠）
+      - 现有函数拆分复用：[`renderProfilesSection`](settingsTab.ts:97) 归入“基础配置”，[`renderActions`](settingsTab.ts:241) 的“测试连接”移动到“连接测试”，历史区域移动到“上传历史”
+      - 字段迁移时保留原事件与持久化逻辑，避免回归
 
 ### 低优先级/长期规划
 
