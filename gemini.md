@@ -21,25 +21,32 @@
     *   **理由**: 改善用户体验，帮助用户快速定位网络问题。
 
 ~~5.  **自定义存储路径/键名格式**:~~
-    *   ~~**描述**: 在设置中允许用户自定义图片的存储路径（Key Prefix）和文件名格式，例如使用 `YYYY/MM/DD/` 作为前缀，或使用 `{timestamp}-{filename}` 格式。~~
-    *   ~~**理由**: 满足不同用户的个性化文件管理需求，是呼声会很高的功能。~~
-    *   已完成: 已在设置面板加入 Key Prefix 字段，并在上传时应用此前缀生成对象键名。
+*   ~~**描述**: 在设置中允许用户自定义图片的存储路径（Key Prefix）和文件名格式，例如使用 `YYYY/MM/DD/` 作为前缀，或使用 `{timestamp}-{filename}` 格式。~~
+*   ~~**理由**: 满足不同用户的个性化文件管理需求，是呼声会很高的功能。~~
+*   已完成: 已在设置面板加入 Key Prefix 字段，并在上传时应用此前缀生成对象键名。
 
 ### 中优先级
 
-6.  **支持多账户配置**:
-    *   **描述**: 允许用户保存多组 S3 配置，并在上传时可以快速切换。
-    *   **理由**: 对于需要管理多个不同项目或客户的用户非常有用。
+~~6.  **支持多账户配置**:~~
+*   ~~**描述**: 允许用户保存多组 S3 配置，并在上传时可以快速切换。~~
+*   ~~**理由**: 对于需要管理多个不同项目或客户的用户非常有用。~~
+*   已完成:
+    - 新增 config/s3Profiles.json（profiles[] + currentProfileId），在[s3/s3Manager.ts](s3/s3Manager.ts:1)提供 loadActiveProfile/listProfiles/upsertProfile/removeProfile/setCurrentProfile，并保留兼容层 loadS3Config/saveS3Config（面向当前激活 Profile 输出旧形态 S3Config）。
+    - 启动时检测 legacy config/s3Config.json，自动迁移生成 Default profile（旧文件保留但不再读取）。
+    - 设置面板采用 Provider Manifest 动态渲染（覆盖 cloudflare-r2/minio/aws-s3/custom），支持新增/删除/重命名/切换 Provider；字段变更通过差异补丁 { id, [key]: value } 即时持久化，并在必要时 setCurrentProfile + 重绘，修复新建 Profile 字段不持久化问题。[settingsTab.ts](settingsTab.ts:1)
+    - 主流程保持兼容：上传与测试仍通过兼容层读取当前 Profile 配置，无需侵入式重构。[main.ts](main.ts:1)
+*   验证:
+    - Cloudflare R2 与 MinIO 连通性与上传测试通过；AWS S3 理论可用（需按实际 region/endpoint 正确配置）。
 
 7.  **图片压缩/优化**:
     *   **描述**: 在上传前，提供选项让用户选择是否对图片进行压缩（例如，使用 `browser-image-compression` 库），并可以设置压缩质量。
     *   **理由**: 节省用户的存储空间和流量成本。
 
 ~~8.  **上传历史记录**:~~
-    *   ~~**描述**: 在设置面板中增加一个区域，显示最近上传的图片列表及其 Markdown 链接，并提供一键复制功能。~~
-    *   ~~**理由**: 方便用户找回之前上传过的图片。~~
-    *   已完成: 已实现历史记录本地持久化与设置面板展示，支持 Copy、Copy All、Clear。
-    *   已完成: 已实现历史记录本地持久化与设置面板展示，支持 Copy、Copy All、Clear。
+*   ~~**描述**: 在设置面板中增加一个区域，显示最近上传的图片列表及其 Markdown 链接，并提供一键复制功能。~~
+*   ~~**理由**: 方便用户找回之前上传过的图片。~~
+*   已完成: 已实现历史记录本地持久化与设置面板展示，支持 Copy、Copy All、Clear。
+*   已完成: 已实现历史记录本地持久化与设置面板展示，支持 Copy、Copy All、Clear。
 
 9.  **国际化 (i18n)**:
     *   **描述**: 将所有UI字符串（如设置面板的标签、通知信息）提取到语言文件中，并支持中英文切换。

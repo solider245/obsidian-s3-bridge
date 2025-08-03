@@ -1,5 +1,6 @@
 import { App, Notice, PluginSettingTab, Setting } from 'obsidian';
 import MyPlugin from './main';
+import { t, tp } from './src/l10n';
 import { loadS3Config, saveS3Config, listProfiles, setCurrentProfile, upsertProfile, removeProfile, S3Profile, ProviderType, loadActiveProfile } from './s3/s3Manager';
 
 export interface MyPluginSettings {
@@ -94,15 +95,15 @@ export class MyPluginSettingTab extends PluginSettingTab {
   }
 
   private renderProfilesSection(containerEl: HTMLElement) {
-    containerEl.createEl('h2', { text: 'S3 Profiles' });
+    containerEl.createEl('h2', { text: t('Uploader Service Configuration') });
 
     const profiles = listProfiles(this.plugin);
     const active = loadActiveProfile(this.plugin);
 
     // 顶部：当前 Profile 选择与基础操作
     const header = new Setting(containerEl)
-      .setName('Active Profile')
-      .setDesc('切换当前使用的账户配置');
+      .setName(t('Select Profile'))
+      .setDesc(t('Select or switch to a different upload profile.'));
 
     header.addDropdown(drop => {
       profiles.forEach(p => {
@@ -114,13 +115,12 @@ export class MyPluginSettingTab extends PluginSettingTab {
       drop.onChange((val) => {
         setCurrentProfile(this.plugin, val);
         this.display();
-        new Notice('Switched active profile');
+        new Notice(tp('Switched to profile: {name}', { name: profiles.find(p => p.id === val)?.name || val }));
       });
     });
 
     header.addButton(btn => {
-      btn.setButtonText('New Profile').onClick(() => {
-        // 默认使用 custom 类型，填入常用默认值
+      btn.setButtonText(t('New Profile')).onClick(() => {
         const created = upsertProfile(this.plugin, {
           name: 'New Profile',
           providerType: 'custom',
@@ -129,24 +129,24 @@ export class MyPluginSettingTab extends PluginSettingTab {
         });
         setCurrentProfile(this.plugin, created.id);
         this.display();
-        new Notice('New profile created');
+        new Notice(t('Profile created'));
       });
     });
 
     if (active?.id) {
       header.addButton(btn => {
-        btn.setButtonText('Delete Current').onClick(() => {
+        btn.setButtonText(t('Delete Current Profile')).onClick(() => {
           removeProfile(this.plugin, active.id);
           this.display();
-          new Notice('Profile deleted');
+          new Notice(t('Profile removed'));
         });
       });
     }
 
     // 当前 Profile 的基础信息编辑：名称与类型
-    const base = new Setting(containerEl).setName('Profile Base');
-    base.addText(t => {
-      t.setPlaceholder('Profile name').setValue(active?.name ?? '').onChange((v) => {
+    const base = new Setting(containerEl).setName(t('Profile Base'));
+    base.addText(ti => {
+      ti.setPlaceholder(t('Profile Name *')).setValue(active?.name ?? '').onChange((v) => {
         if (!active) return;
         // 仅提交差异补丁并带上 id，避免老快照覆盖
         const merged = upsertProfile(this.plugin, { id: active.id, name: v.trim() });
@@ -157,7 +157,7 @@ export class MyPluginSettingTab extends PluginSettingTab {
     });
     base.addDropdown(dd => {
       const types: ProviderType[] = ['cloudflare-r2', 'minio', 'aws-s3', 'custom'];
-      types.forEach(tp => dd.addOption(tp, tp));
+      types.forEach(tpv => dd.addOption(tpv, t(tpv)));
       dd.setValue(active?.providerType ?? 'custom');
       dd.onChange((val: ProviderType) => {
         if (!active) return;
@@ -172,13 +172,14 @@ export class MyPluginSettingTab extends PluginSettingTab {
   private renderProfileForm(containerEl: HTMLElement) {
     const active = loadActiveProfile(this.plugin);
     const fields = PROVIDER_MANIFEST[active.providerType] ?? PROVIDER_MANIFEST['custom'];
+    containerEl.createEl('h3', { text: t('Profile Details') });
 
     // 逐项渲染
     for (const field of fields) {
       const currentVal = (active as any)[field.key];
       const setting = new Setting(containerEl)
-        .setName(field.label + (field.required ? ' *' : ''))
-        .setDesc(field.note);
+        .setName(t(field.label + (field.required ? ' *' : '')))
+        .setDesc(field.note ? t(field.note) : '');
 
       if (field.type === 'toggle') {
         setting.addToggle(tg => {
@@ -195,7 +196,7 @@ export class MyPluginSettingTab extends PluginSettingTab {
 
       // 文本或密码
       setting.addText(tx => {
-        tx.setPlaceholder(field.placeholder);
+        tx.setPlaceholder(t(field.placeholder));
         tx.setValue((currentVal ?? field.defaultValue ?? '').toString());
         if (field.type === 'password') {
           try {
@@ -214,23 +215,23 @@ export class MyPluginSettingTab extends PluginSettingTab {
 
   private renderActions(containerEl: HTMLElement) {
     const actions = new Setting(containerEl)
-      .setName('Actions')
-      .setDesc('保存并重载客户端或进行连通性测试');
+      .setName(t('Actions'))
+      .setDesc(t('Save and Reload') + ' / ' + t('Test Connection'));
 
     actions.addButton(btn => {
-      btn.setButtonText('Save and Reload').setCta().onClick(() => {
-        // 向后兼容旧保存：保存当前 profile 字段并刷新
-        const compat = loadS3Config(this.plugin);
-        // 直接复用 saveS3Config 以更新当前 profile
-        // 注意：loadS3Config/ saveS3Config 在 s3Manager 中已被改为当前 profile 视角
-        // 因为我们在表单变更时已 upsertProfile 实时保存，此处仅触发客户端重载
-        this.plugin.reloadS3ConfigAndClient();
-        new Notice('S3 settings saved and client reloaded');
+      btn.setButtonText(t('Save and Reload')).setCta().onClick(() => {
+        // 因为我们在表单变更时已 upsertProfile 实时保存，此处仅触发客户端重载（若存在该方法）
+        // @ts-ignore
+        if (this.plugin.reloadS3ConfigAndClient) {
+          // @ts-ignore
+          this.plugin.reloadS3ConfigAndClient();
+        }
+        new Notice(t('Profile updated'));
       });
     });
 
     actions.addButton(btn => {
-      btn.setButtonText('Test Connection').onClick(async (evt) => {
+      btn.setButtonText(t('Test Connection')).onClick(async (evt) => {
         const plugin = this.plugin;
         const cfg = loadS3Config(plugin);
 
@@ -282,13 +283,10 @@ export class MyPluginSettingTab extends PluginSettingTab {
         const removeGuard = installGuard();
 
         try {
-          const main = await import('./main');
-          await main.testS3ConnectionViaPresign(plugin, {
-            key: testKey,
-            contentType: 'image/png',
-            bodyBase64: tinyPngBase64,
-          });
-          new Notice('S3 connection test succeeded');
+          // 统一走 Obsidian 命令，避免直接依赖 main 导出
+          this.app.workspace.trigger('execute-command', {
+            id: 'obs3gemini-test-connection'
+          } as any);
         } catch (error) {
           const msg = (error as Error)?.message || '';
           if (msg.includes('Blocked renderer fetch to R2 during Test Connection')) {
@@ -296,7 +294,7 @@ export class MyPluginSettingTab extends PluginSettingTab {
             new Notice('已阻断渲染端直连 R2（测试期），该提示不影响主进程连通性结果');
           } else {
             console.error('[ob-s3-gemini] Test Connection failed (main path):', error);
-            new Notice('S3 connection test failed: ' + (error as Error).message);
+            new Notice(tp('Connection test failed: {error}', { error: (error as Error).message }));
           }
         } finally {
           try { removeGuard && removeGuard(); } catch {}
@@ -313,11 +311,11 @@ export class MyPluginSettingTab extends PluginSettingTab {
     containerEl.empty();
 
     this.renderProfilesSection(containerEl);
-    containerEl.createEl('h3', { text: 'Profile Details' });
+    // 标题在 renderProfileForm 内创建
     this.renderProfileForm(containerEl);
 
     // 历史记录区块
-    containerEl.createEl('h3', { text: 'Upload History' });
+    containerEl.createEl('h3', { text: t('Upload History') });
     const historyContainer = containerEl.createDiv({ cls: 'ob-s3-history' });
 
     const renderHistory = () => {
@@ -325,14 +323,14 @@ export class MyPluginSettingTab extends PluginSettingTab {
       const history = readHistory();
 
       if (!history.length) {
-        historyContainer.createEl('div', { text: 'No upload history yet.' });
+        historyContainer.createEl('div', { text: t('No upload history yet.') });
         return;
       }
 
       // 操作按钮行
       const ops = historyContainer.createDiv({ cls: 'ob-s3-history-ops' });
-      const btnCopyAll = ops.createEl('button', { text: 'Copy All Links' });
-      const btnClear = ops.createEl('button', { text: 'Clear History' });
+      const btnCopyAll = ops.createEl('button', { text: t('Copy All Links') });
+      const btnClear = ops.createEl('button', { text: t('Clear History') });
 
       btnCopyAll.onclick = async () => {
         try {
@@ -341,20 +339,20 @@ export class MyPluginSettingTab extends PluginSettingTab {
             .map((e: any) => e.url)
             .join('\n');
           if (!links) {
-            new Notice('No successful uploads to copy.');
+            new Notice(t('No successful uploads to copy.'));
             return;
           }
           await navigator.clipboard.writeText(links);
-          new Notice('All links copied to clipboard');
+          new Notice(t('All links copied to clipboard'));
         } catch {
-          new Notice('Copy failed');
+          new Notice(t('Copy failed'));
         }
       };
 
       btnClear.onclick = () => {
         writeHistory([]);
         renderHistory();
-        new Notice('Upload history cleared');
+        new Notice(t('Upload history cleared'));
       };
 
       // 列表
@@ -365,22 +363,22 @@ export class MyPluginSettingTab extends PluginSettingTab {
 
         const meta = row.createEl('div', { cls: 'ob-s3-history-meta' });
         const time = new Date(item.time ?? Date.now()).toLocaleString();
-        meta.createEl('div', { text: item.fileName ?? '(unknown file)' });
-        meta.createEl('div', { text: item.key ? `Key: ${item.key}` : 'Key: -' });
-        meta.createEl('div', { text: `Time: ${time}` });
+        meta.createEl('div', { text: item.fileName ?? t('(unknown file)') });
+        meta.createEl('div', { text: item.key ? `Key: ${item.key}` : t('Key: -') });
+        meta.createEl('div', { text: `${t('Time')}: ${time}` });
 
         if (item.error) {
           const err = row.createEl('div', { cls: 'ob-s3-history-error' });
-          err.createEl('span', { text: `Error: ${item.error}` });
+          err.createEl('span', { text: `${t('Error')}: ${item.error}` });
         } else {
           const linkWrap = row.createEl('div', { cls: 'ob-s3-history-link' });
           const a = linkWrap.createEl('a', { text: item.url, href: item.url });
           a.target = '_blank';
 
-          const btnCopy = linkWrap.createEl('button', { text: 'Copy' });
+          const btnCopy = linkWrap.createEl('button', { text: t('Copy') });
           btnCopy.onclick = async () => {
             await navigator.clipboard.writeText(item.url);
-            new Notice('Link copied');
+            new Notice(t('Link copied'));
           };
         }
       });
