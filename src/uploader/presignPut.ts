@@ -1,7 +1,7 @@
-import { Plugin } from 'obsidian';
+import { Plugin, Notice } from 'obsidian';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { loadS3Config } from '../../s3/s3Manager';
+import { loadS3Config, buildPublicUrl } from '../../s3/s3Manager';
 
 // 采用 node:https 作为 HTTP 客户端，避免打包器处理 node: 前缀内置模块的问题
 import * as https from 'https';
@@ -126,15 +126,21 @@ export async function putWithHttps(
 /**
  * 主进程组合动作：生成预签名 URL，然后执行 PUT
  * 调用方传入 base64 字符串以避免渲染端直接接触二进制
+ * 返回值：公开访问链接（基于 Profile.baseUrl 等规则）
  */
 export async function presignAndPutObject(
   plugin: Plugin,
   opts: { key: string; contentType: string; bodyBase64: string; expiresInSeconds?: number }
-): Promise<void> {
+): Promise<string> {
   const { key, contentType, bodyBase64, expiresInSeconds = 300 } = opts;
   const url = await getPresignedPutUrl(plugin, key, contentType, expiresInSeconds);
   const body = Buffer.from(bodyBase64, 'base64');
   await putWithHttps(url, body, contentType);
+
+  // 生成最终公开链接
+  const publicUrl = buildPublicUrl(plugin, key);
+  try { new Notice('Upload successful!'); } catch {}
+  return publicUrl;
 }
 
 /**
@@ -147,7 +153,7 @@ export async function testConnectionViaPresign(
 ): Promise<void> {
   const { key, contentType, bodyBase64, expiresInSeconds = 300 } = opts;
 
-  // 预签名并上传
+  // 预签名并上传（丢弃返回的公开链接，不在测试里访问）
   await presignAndPutObject(plugin, { key, contentType, bodyBase64, expiresInSeconds });
 
   // 清理对象

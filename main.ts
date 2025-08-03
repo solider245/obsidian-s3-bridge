@@ -1,7 +1,54 @@
-import { Notice, Plugin } from 'obsidian';
+import { Notice, Plugin, Editor, MarkdownView } from 'obsidian';
 import { loadS3Config } from './s3/s3Manager';
 import { t, tp, loadTranslations } from './src/l10n';
 import { MyPluginSettingTab, DEFAULT_SETTINGS } from './settingsTab';
+import { presignAndPutObject } from './src/uploader/presignPut';
+
+function getFileExtensionFromMime(mime: string): string {
+  if (!mime) return 'bin';
+  const m = mime.toLowerCase();
+  if (m.includes('png')) return 'png';
+  if (m.includes('jpeg') || m.includes('jpg')) return 'jpg';
+  if (m.includes('gif')) return 'gif';
+  if (m.includes('webp')) return 'webp';
+  if (m.includes('svg')) return 'svg';
+  if (m.includes('bmp')) return 'bmp';
+  if (m.includes('tiff')) return 'tiff';
+  return 'bin';
+}
+
+function makeObjectKey(originalName: string | null, ext: string, prefix: string): string {
+  const safePrefix = (prefix || '').replace(/^\/+|\/+$/g, '');
+  const ts = Date.now();
+  const rand = Math.random().toString(36).slice(2);
+  const base = originalName
+    ? originalName.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/\s+/g, '_')
+    : `${ts}_${rand}.${ext}`;
+  const withExt = base.endsWith(`.${ext}`) ? base : `${base}.${ext}`;
+  return (safePrefix ? `${safePrefix}/` : '') + withExt;
+}
+
+async function readClipboardImageAsBase64(): Promise<{ base64: string; mime: string } | null> {
+  try {
+    // Obsidian 桌面端支持 navigator.clipboard.read
+    // 兼容性处理：若不可用则返回 null
+    const anyNav: any = navigator as any;
+    if (!anyNav.clipboard?.read) return null;
+    const items: ClipboardItem[] = await anyNav.clipboard.read();
+    for (const item of items) {
+      const type = item.types.find((t) => t.startsWith('image/'));
+      if (type) {
+        const blob = await item.getType(type);
+        const arrayBuffer = await blob.arrayBuffer();
+        const base64 = Buffer.from(arrayBuffer).toString('base64');
+        return { base64, mime: type };
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 export default class ObS3GeminiPlugin extends Plugin {
   async onload() {
@@ -36,7 +83,8 @@ export default class ObS3GeminiPlugin extends Plugin {
     }
 
     // 初始化配置（保持兼容层）
-    await loadS3Config(this);
+    const cfg = await loadS3Config(this);
+    const keyPrefix = (cfg.keyPrefix || '').replace(/^\/+|\/+$/g, '');
 
     // 注册“测试连接”命令（使用 t/tp 包裹用户可见文案）
     this.addCommand({
@@ -50,6 +98,76 @@ export default class ObS3GeminiPlugin extends Plugin {
         }
       },
     });
+
+    // 命令：从剪贴板上传图片并插入链接
+    this.addCommand({
+      id: 'obs3gemini-upload-from-clipboard',
+      name: 'Upload Image from Clipboard',
+      callback: async () => {
+        try {
+          const clip = await readClipboardImageAsBase64();
+          if (!clip) {
+            new Notice(tp('Upload failed: {error}', { error: 'No image in clipboard' }));
+            return;
+          }
+          const ext = getFileExtensionFromMime(clip.mime);
+          const key = makeObjectKey(null, ext, keyPrefix);
+          const publicUrl = await presignAndPutObject(this, {
+            key,
+            contentType: clip.mime || 'application/octet-stream',
+            bodyBase64: clip.base64,
+          });
+
+          const md = `![](${publicUrl})`;
+          const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+          if (view) {
+            const editor: Editor = view.editor;
+            editor.replaceSelection(md);
+          }
+          new Notice(t('Upload successful!'));
+        } catch (e: any) {
+          new Notice(tp('Upload failed: {error}', { error: e?.message ?? String(e) }));
+        }
+      },
+    });
+
+    // 监听编辑器粘贴事件：若有图片则上传并插入 Markdown 图片链接
+    this.registerEvent(
+      this.app.workspace.on('editor-paste', async (evt, editor: Editor) => {
+        try {
+          const items = evt.clipboardData?.items;
+          if (!items || items.length === 0) return;
+
+          const fileItem = Array.from(items).find(
+            (it) => it.kind === 'file' && it.type.startsWith('image/')
+          );
+          if (!fileItem) return;
+
+          // 阻止默认粘贴图片为附件的行为
+          evt.preventDefault();
+
+          const file = fileItem.getAsFile();
+          if (!file) return;
+
+          const arrayBuffer = await file.arrayBuffer();
+          const base64 = Buffer.from(arrayBuffer).toString('base64');
+          const mime = file.type || 'application/octet-stream';
+          const ext = getFileExtensionFromMime(mime);
+          const key = makeObjectKey(file.name || null, ext, keyPrefix);
+
+          const publicUrl = await presignAndPutObject(this, {
+            key,
+            contentType: mime,
+            bodyBase64: base64,
+          });
+
+          editor.replaceSelection(`![](${publicUrl})`);
+          new Notice(t('Upload successful!'));
+        } catch (e: any) {
+          new Notice(tp('Upload failed: {error}', { error: e?.message ?? String(e) }));
+        }
+      })
+    );
   }
 
   async onunload() {

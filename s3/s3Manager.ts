@@ -255,6 +255,55 @@ export function loadS3Config(plugin: Plugin): S3Config {
 }
 
 /**
+ * 生成面向用户的公开访问链接
+ * 规则：
+ * - 优先使用 baseUrl（必须是面向公网的域名，如 R2 的 <bucket>.r2.dev 或自定义域）
+ * - 若 baseUrl 为空：
+ *    * cloudflare-r2: 抛错提示用户必须配置 baseUrl
+ *    * aws-s3: 使用 https://{bucket}.s3.{region}.amazonaws.com/{key}
+ *    * minio/custom: 退化到 {endpoint}/{bucket}/{key}（仅当 endpoint 可被公网访问时才有效）
+ */
+export function buildPublicUrl(plugin: Plugin, key: string): string {
+  const p = loadActiveProfile(plugin);
+  const bucket = (p.bucketName || '').trim();
+  const prefix = (p.keyPrefix || '').replace(/^\/+|\/+$/g, '');
+  const finalKey = (prefix ? `${prefix}/` : '') + key.replace(/^\/+/, '');
+
+  // 优先 baseUrl
+  const base = (p.baseUrl || '').trim();
+  if (base) {
+    // 去除多余斜杠
+    const baseClean = base.replace(/\/+$/g, '');
+    // 对于 R2，通常 baseUrl 已经是 <bucket>.r2.dev 或自定义域，不应再追加 bucket 段
+    // 其他提供商若 baseUrl 就是自定义 CDN/域名，同理不应重复 bucket
+    return `${baseClean}/${finalKey}`;
+  }
+
+  // 无 baseUrl 的兜底行为
+  if (p.providerType === 'cloudflare-r2') {
+    // R2 的 API 端点不可作为公开直链域名
+    throw new Error('Cloudflare R2 需要在配置中填写 Public Base URL（例如 https://<bucket>.r2.dev 或你的自定义域）以生成正确的公开链接');
+  }
+
+  if (p.providerType === 'aws-s3') {
+    const region = (p.region || 'us-east-1').trim();
+    // 兼容 us-east-1 域名形态（现代通常也带区域）
+    const host = region === 'us-east-1'
+      ? `${bucket}.s3.amazonaws.com`
+      : `${bucket}.s3.${region}.amazonaws.com`;
+    return `https://${host}/${finalKey}`;
+  }
+
+  // minio/custom 退化到 endpoint 路径风格
+  const ep = (p.endpoint || '').trim().replace(/\/+$/g, '');
+  if (!ep) {
+    // 没有 endpoint、没有 baseUrl 的情况下无法构造
+    throw new Error('缺少 Public Base URL，且无法从 endpoint 推导公开访问地址，请在配置中填写 Public Base URL');
+  }
+  return `${ep}/${bucket}/${finalKey}`;
+}
+
+/**
  * 向后兼容函数：保存当前 Profile 的字段
  * 旧调用方继续可用；内部会更新当前激活 Profile
  */
