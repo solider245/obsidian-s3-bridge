@@ -47,6 +47,5 @@
   "Max Upload Size (MB)": "最大上传大小（MB）",
   "Default 5MB. Files over this size will trigger a confirmation dialog before upload.": "默认 5MB。超过该值将弹出二次确认，确认后继续上传。",
   "File exceeds {mb}MB (current limit: {limit}MB). Continue upload?": "文件大小为 {mb}MB，超过当前限制 {limit}MB。是否继续上传？",
-  "Upload canceled by user": "已取消上传",
-  "Upload File from Local...": "从本地上传文件到 S3…"
+  "Upload canceled by user": "已取消上传"
 }
