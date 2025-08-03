@@ -33,6 +33,7 @@ export interface S3Profile {
   keyPrefix?: string;
   useSSL: boolean;
   baseUrl?: string;          // 公共访问域名，用于拼接展示链接
+  maxUploadMB?: number;      // 新增：每个 Profile 的最大上传大小（MB），默认 5
 }
 
 /**
@@ -72,6 +73,7 @@ function createEmptyProfile(overrides: Partial<S3Profile> = {}): S3Profile {
     keyPrefix: overrides.keyPrefix ?? '',
     useSSL: overrides.useSSL ?? true,
     baseUrl: overrides.baseUrl ?? '',
+    maxUploadMB: overrides.maxUploadMB ?? 5,
   };
 }
 
@@ -120,6 +122,7 @@ function writeProfilesFile(plugin: Plugin, data: S3ProfilesFile): void {
       ...p,
       keyPrefix: p.keyPrefix ?? '',
       baseUrl: (p as any).baseUrl ?? '',
+      maxUploadMB: (p as any).maxUploadMB ?? 5,
     })),
   };
   fs.writeFileSync(file, JSON.stringify(normalized, null, 2), 'utf-8');

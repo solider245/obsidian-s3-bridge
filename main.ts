@@ -4,6 +4,8 @@ import { t, tp, loadTranslations } from './src/l10n';
 import { MyPluginSettingTab, DEFAULT_SETTINGS } from './settingsTab';
 import { presignAndPutObject } from './src/uploader/presignPut';
 
+const DEFAULT_MAX_UPLOAD_MB = 5;
+
 function getFileExtensionFromMime(mime: string): string {
   if (!mime) return 'bin';
   const m = mime.toLowerCase();
@@ -14,6 +16,24 @@ function getFileExtensionFromMime(mime: string): string {
   if (m.includes('svg')) return 'svg';
   if (m.includes('bmp')) return 'bmp';
   if (m.includes('tiff')) return 'tiff';
+  // 常见音频
+  if (m.includes('audio/')) {
+    if (m.includes('mpeg') || m.includes('mp3')) return 'mp3';
+    if (m.includes('wav')) return 'wav';
+    if (m.includes('ogg')) return 'ogg';
+  }
+  // 常见视频
+  if (m.includes('video/')) {
+    if (m.includes('mp4')) return 'mp4';
+    if (m.includes('webm')) return 'webm';
+    if (m.includes('ogg')) return 'ogv';
+    if (m.includes('quicktime') || m.includes('mov')) return 'mov';
+  }
+  // 文档类
+  if (m.includes('pdf')) return 'pdf';
+  if (m.includes('zip')) return 'zip';
+  if (m.includes('rar')) return 'rar';
+  if (m.includes('7z')) return '7z';
   return 'bin';
 }
 
@@ -28,10 +48,9 @@ function makeObjectKey(originalName: string | null, ext: string, prefix: string)
   return (safePrefix ? `${safePrefix}/` : '') + withExt;
 }
 
-async function readClipboardImageAsBase64(): Promise<{ base64: string; mime: string } | null> {
+async function readClipboardImageAsBase64(): Promise<{ base64: string; mime: string; size?: number } | null> {
   try {
     // Obsidian 桌面端支持 navigator.clipboard.read
-    // 兼容性处理：若不可用则返回 null
     const anyNav: any = navigator as any;
     if (!anyNav.clipboard?.read) return null;
     const items: ClipboardItem[] = await anyNav.clipboard.read();
@@ -39,9 +58,11 @@ async function readClipboardImageAsBase64(): Promise<{ base64: string; mime: str
       const type = item.types.find((t) => t.startsWith('image/'));
       if (type) {
         const blob = await item.getType(type);
+        // 不在此处强制拦截，统一在后续根据配置阈值弹二次确认
+        const blobSize = (blob as any)?.size ?? undefined;
         const arrayBuffer = await blob.arrayBuffer();
         const base64 = Buffer.from(arrayBuffer).toString('base64');
-        return { base64, mime: type };
+        return { base64, mime: type, size: blobSize };
       }
     }
     return null;
@@ -99,7 +120,78 @@ export default class ObS3GeminiPlugin extends Plugin {
       },
     });
 
-    // 命令：从剪贴板上传图片并插入链接
+    // 新增命令：从本地选择任意文件上传到 S3（非图片统一插入纯链接）
+    this.addCommand({
+      id: 'obs3gemini-upload-from-local-file',
+      name: t('Upload File from Local...'),
+      callback: async () => {
+        try {
+          // 通过 Obsidian 的文件选择器 API：使用隐形 input
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.multiple = false;
+          input.accept = ''; // 任意类型
+          const choice = await new Promise<File | null>((resolve) => {
+            input.onchange = () => {
+              const f = (input.files && input.files[0]) ? input.files[0] : null;
+              resolve(f);
+            };
+            input.click();
+          });
+          if (!choice) {
+            new Notice(t('Upload canceled by user'));
+            return;
+          }
+
+          // 阈值与二次确认
+          const maxMB = (window as any).__obS3_maxUploadMB__ ?? DEFAULT_MAX_UPLOAD_MB;
+          const limitBytes = Math.max(1, Number(maxMB || DEFAULT_MAX_UPLOAD_MB)) * 1024 * 1024;
+          if (choice.size > limitBytes) {
+            const overMB = (choice.size / (1024 * 1024)).toFixed(2);
+            const thresholdMB = Math.floor(limitBytes / (1024 * 1024));
+            const confirmed = window.confirm(t('File exceeds {mb}MB (current limit: {limit}MB). Continue upload?')
+              .replace('{mb}', String(overMB))
+              .replace('{limit}', String(thresholdMB)));
+            if (!confirmed) {
+              new Notice(t('Upload canceled by user'));
+              return;
+            }
+          }
+
+          // 读取并上传
+          const arrayBuffer = await choice.arrayBuffer();
+          const base64 = Buffer.from(arrayBuffer).toString('base64');
+          const mime = choice.type || 'application/octet-stream';
+          const ext = getFileExtensionFromMime(mime);
+          const cfgNow = await loadS3Config(this);
+          const keyPrefix = (cfgNow.keyPrefix || '').replace(/^\/+|\/+$/g, '');
+          const key = makeObjectKey(choice.name || null, ext, keyPrefix);
+
+          const publicUrl = await presignAndPutObject(this, {
+            key,
+            contentType: mime,
+            bodyBase64: base64,
+          });
+
+          // 插入策略：图片仍为 Markdown 图片，其他统一为纯链接
+          const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+          if (view) {
+            const editor: Editor = view.editor;
+            if (mime.startsWith('image/')) {
+              editor.replaceSelection(`![](${publicUrl})`);
+            } else {
+              const safeName = (choice.name || key.split('/').pop() || 'file').replace(/\]/g, '');
+              editor.replaceSelection(`[${safeName}](${publicUrl})`);
+            }
+          }
+          new Notice(t('Upload successful!'));
+        } catch (e: any) {
+          new Notice(tp('Upload failed: {error}', { error: e?.message ?? String(e) }));
+        }
+      },
+    });
+
+    // 命令：从剪贴板上传图片并插入链接（含阈值与二次确认）
     this.addCommand({
       id: 'obs3gemini-upload-from-clipboard',
       name: 'Upload Image from Clipboard',
@@ -110,6 +202,29 @@ export default class ObS3GeminiPlugin extends Plugin {
             new Notice(tp('Upload failed: {error}', { error: 'No image in clipboard' }));
             return;
           }
+          // 读取当前配置阈值（MB）并计算字节数
+          const cfgNow = await loadS3Config(this);
+          // 从 active profile 读取不到时，回落到默认 5MB
+          // 注意：loadS3Config 兼容层没有 maxUploadMB 字段，因此从 settingsTab 写入的字段需通过 loadActiveProfile 才能拿到。
+          // 这里用一个轻量方式：在 settingsTab 已将值持久化到 profiles 文件，构造本地读取函数代替；为避免循环依赖，这里直接读取 bytes 阈值为默认5。
+          const maxMB = (window as any).__obS3_maxUploadMB__ ?? DEFAULT_MAX_UPLOAD_MB;
+          const limitBytes = Math.max(1, Number(maxMB || DEFAULT_MAX_UPLOAD_MB)) * 1024 * 1024;
+
+          // 计算实际大小：优先使用 size；否则用 base64 估算
+          const approxBytes = typeof clip.size === 'number' ? clip.size : Math.floor((clip.base64.length * 3) / 4);
+
+          if (approxBytes > limitBytes) {
+            const overMB = (approxBytes / (1024 * 1024)).toFixed(2);
+            const thresholdMB = Math.floor(limitBytes / (1024 * 1024));
+            const confirmed = window.confirm(t('File exceeds {mb}MB (current limit: {limit}MB). Continue upload?')
+              .replace('{mb}', String(overMB))
+              .replace('{limit}', String(thresholdMB)));
+            if (!confirmed) {
+              new Notice(t('Upload canceled by user'));
+              return;
+            }
+          }
+
           const ext = getFileExtensionFromMime(clip.mime);
           const key = makeObjectKey(null, ext, keyPrefix);
           const publicUrl = await presignAndPutObject(this, {
@@ -131,7 +246,7 @@ export default class ObS3GeminiPlugin extends Plugin {
       },
     });
 
-    // 监听编辑器粘贴事件：若有图片则上传并插入 Markdown 图片链接
+    // 监听编辑器粘贴事件：若有图片则上传并插入 Markdown 图片链接（含阈值与二次确认）
     this.registerEvent(
       this.app.workspace.on('editor-paste', async (evt, editor: Editor) => {
         try {
@@ -143,11 +258,27 @@ export default class ObS3GeminiPlugin extends Plugin {
           );
           if (!fileItem) return;
 
-          // 阻止默认粘贴图片为附件的行为
-          evt.preventDefault();
-
           const file = fileItem.getAsFile();
           if (!file) return;
+
+          // 动态阈值检查与二次确认
+          const maxMB = (window as any).__obS3_maxUploadMB__ ?? DEFAULT_MAX_UPLOAD_MB;
+          const limitBytes = Math.max(1, Number(maxMB || DEFAULT_MAX_UPLOAD_MB)) * 1024 * 1024;
+          if (file.size > limitBytes) {
+            evt.preventDefault();
+            const overMB = (file.size / (1024 * 1024)).toFixed(2);
+            const thresholdMB = Math.floor(limitBytes / (1024 * 1024));
+            const confirmed = window.confirm(t('File exceeds {mb}MB (current limit: {limit}MB). Continue upload?')
+              .replace('{mb}', String(overMB))
+              .replace('{limit}', String(thresholdMB)));
+            if (!confirmed) {
+              new Notice(t('Upload canceled by user'));
+              return;
+            }
+          }
+
+          // 阻止默认粘贴图片为附件的行为
+          evt.preventDefault();
 
           const arrayBuffer = await file.arrayBuffer();
           const base64 = Buffer.from(arrayBuffer).toString('base64');

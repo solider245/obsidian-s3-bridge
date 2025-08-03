@@ -167,6 +167,31 @@ export class MyPluginSettingTab extends PluginSettingTab {
         this.display();
       });
     });
+
+    // 新增：最大上传大小（MB）
+    const maxSize = new Setting(containerEl)
+      .setName(t('Max Upload Size (MB)'))
+      .setDesc(t('Default 5MB. Files over this size will trigger a confirmation dialog before upload.'));
+    maxSize.addText(text => {
+      const val = (active as any)?.maxUploadMB ?? 5;
+      text.setPlaceholder('5').setValue(String(val));
+      text.onChange(v => {
+        if (!active) return;
+        const num = Number(v);
+        const safe = Number.isFinite(num) && num > 0 ? Math.floor(num) : 5;
+        const merged = upsertProfile(this.plugin, { id: active.id, maxUploadMB: safe });
+        setCurrentProfile(this.plugin, merged.id);
+        // 不强制重绘
+      });
+    });
+
+    // 将当前 profile 的最大上传大小暴露到 window，供 main.ts 使用
+    try {
+      const activeNow = loadActiveProfile(this.plugin) as any;
+      (window as any).__obS3_maxUploadMB__ = Number.isFinite(activeNow?.maxUploadMB) && activeNow?.maxUploadMB > 0
+        ? Math.floor(activeNow.maxUploadMB)
+        : 5;
+    } catch { /* noop */ }
   }
 
   private renderProfileForm(containerEl: HTMLElement) {
@@ -311,6 +336,13 @@ export class MyPluginSettingTab extends PluginSettingTab {
     containerEl.empty();
 
     this.renderProfilesSection(containerEl);
+    // 每次渲染时同步 window 上的阈值
+    try {
+      const activeNow = loadActiveProfile(this.plugin) as any;
+      (window as any).__obS3_maxUploadMB__ = Number.isFinite(activeNow?.maxUploadMB) && activeNow?.maxUploadMB > 0
+        ? Math.floor(activeNow.maxUploadMB)
+        : 5;
+    } catch { /* noop */ }
     // 标题在 renderProfileForm 内创建
     this.renderProfileForm(containerEl);
 
