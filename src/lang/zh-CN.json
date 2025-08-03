@@ -47,5 +47,22 @@
   "Max Upload Size (MB)": "最大上传大小（MB）",
   "Default 5MB. Files over this size will trigger a confirmation dialog before upload.": "默认 5MB。超过该值将弹出二次确认，确认后继续上传。",
   "File exceeds {mb}MB (current limit: {limit}MB). Continue upload?": "文件大小为 {mb}MB，超过当前限制 {limit}MB。是否继续上传？",
-  "Upload canceled by user": "已取消上传"
+  "Upload canceled by user": "已取消上传",
+
+  "S3 Uploader": "S3 上传器",
+  "Opening settings...": "正在打开设置…",
+  "Upload History": "上传历史",
+  "No upload history yet.": "暂无上传历史。",
+  "Copy All Links": "复制全部链接",
+  "Clear History": "清空历史",
+  "No successful uploads to copy.": "没有可复制的成功上传记录。",
+  "All links copied to clipboard": "已复制全部链接到剪贴板",
+  "Copy failed": "复制失败",
+  "Upload history cleared": "已清空上传历史",
+  "(unknown file)": "（未知文件）",
+  "Key: -": "键名：-",
+  "Time": "时间",
+  "Error": "错误",
+  "Copy": "复制",
+  "Link copied": "链接已复制"
 }

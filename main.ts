@@ -1,10 +1,22 @@
 import { Notice, Plugin, Editor, MarkdownView } from 'obsidian';
 import { loadS3Config } from './s3/s3Manager';
-import { t, tp, loadTranslations } from './src/l10n';
+import { t, tp, loadTranslations, registerBuiltinLang } from './src/l10n';
 import { MyPluginSettingTab, DEFAULT_SETTINGS } from './settingsTab';
 import { presignAndPutObject } from './src/uploader/presignPut';
 
 const DEFAULT_MAX_UPLOAD_MB = 5;
+
+// 在加载翻译前注册内置语言资源，兼容 zh-cn 与 zh-CN
+// 采用 require 避免 TypeScript 对 json import 的报错
+let __zhCN__: any = {};
+try {
+  // @ts-ignore
+  __zhCN__ = require('./src/lang/zh-CN.json');
+} catch (e) {
+  console.warn('[ob-s3-gemini] zh-CN language pack not bundled, fallback to English.');
+}
+registerBuiltinLang('zh-cn', __zhCN__);
+registerBuiltinLang('zh-CN', __zhCN__);
 
 function getFileExtensionFromMime(mime: string): string {
   if (!mime) return 'bin';
