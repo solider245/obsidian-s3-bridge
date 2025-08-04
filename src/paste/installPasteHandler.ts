@@ -109,16 +109,15 @@ export function installPasteHandler(ctx: PasteCtx): void {
         const OBS3_ASSETS = `${OBS3_ROOT}/assets`;
         const tempDir = OBS3_ASSETS as string;
 
-        // 1) 构造占位：blob 或 临时文件
+        // 1) 构造占位：始终先用 blob URL 作为编辑器即时预览，避免“找不到”闪烁
         const uploadId = generateUploadId();
-        let previewUrl: string;
+        // 用于编辑器占位的即时预览地址（总是 blob）
+        let previewUrl: string = URL.createObjectURL(file);
 
         if (!enableTempLocal) {
-          // 内存 blob 模式
-          const blobUrl = URL.createObjectURL(file);
-          previewUrl = blobUrl;
+          // 非临时模式：仅使用内存 blob，后续直接依赖缓存上传
         } else {
-          // 临时附件模式
+          // 临时附件模式：后台同时把文件写入 vault 以便持久化与重试
           try {
             const ext = getExt(mime);
             const ts = Date.now();
@@ -185,25 +184,21 @@ export function installPasteHandler(ctx: PasteCtx): void {
             }
     
             if (!finalFullPath) {
-              // 所有尝试都失败，回退为 blob 预览
-              const blobUrl = URL.createObjectURL(file);
-              previewUrl = blobUrl;
+              // 所有尝试都失败；占位仍用 blob，无需更改
               new Notice(tp('Local temp file write failed, fallback to blob: {error}', { error: (lastErr as any)?.message ?? String(lastErr) }));
             } else {
               // 重要修正：Obsidian 资源解析遵循 “vault 相对路径（不以 / 开头）”
-              // 此处确保是以 ".obs3/assets/..." 开头的 vault 相对路径（而非 "./.obs3..." 或 "/.obs3..."）。
-              previewUrl = finalFullPath.replace(/^\.?\/?\.obs3\/assets\//, '.obs3/assets/');
-              // 强制双保险：始终覆盖写缓存与映射，确保后续读取稳定
+              // 将写入成功的真实 vault 相对路径记录到映射，供队列读取；编辑器占位仍保持 blob，避免闪烁
+              const vaultRel = finalFullPath.replace(/^\.?\/?\.obs3\/assets\//, '.obs3/assets/');
               try { optimistic.cacheUploadPayload(uploadId, { base64, mime, fileName: file.name || undefined }); } catch {}
               try {
                 const mark = (window as any).__obS3_tempFiles__ as Map<string, string> | undefined;
                 if (!mark) (window as any).__obS3_tempFiles__ = new Map<string, string>();
-                ((window as any).__obS3_tempFiles__ as Map<string, string>).set(uploadId, finalFullPath);
+                ((window as any).__obS3_tempFiles__ as Map<string, string>).set(uploadId, vaultRel);
               } catch {}
             }
           } catch (e: any) {
-            const blobUrl = URL.createObjectURL(file);
-            previewUrl = blobUrl;
+            // 失败情况下占位仍为 blob
             new Notice(tp('Local temp file write failed, fallback to blob: {error}', { error: e?.message ?? String(e) }));
           }
         }
