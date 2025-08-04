@@ -13,3 +13,6 @@ node_modules/
 
 # 缓存数据库
 .\data.json
+# 兼容不同平台的 data.json 路径写法（不纳入版本控制）
+data.json
+.obsidian/plugins/**/data.json
