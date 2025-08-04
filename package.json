@@ -1,7 +1,7 @@
 {
-	"name": "obsidian-sample-plugin",
+	"name": "obsidian-s3-bridge",
 	"version": "1.0.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"description": "Automatically upload pasted images/files to S3-compatible storage (AWS S3 / Cloudflare R2 / MinIO) and insert accessible links in your notes.",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
@@ -12,8 +12,8 @@
 		"test:unit": "vitest run tests/unit",
 		"test:behavior": "vitest run tests/behavior"
 	},
-	"keywords": [],
-	"author": "",
+	"keywords": ["obsidian", "s3", "r2", "minio", "upload", "paste", "image", "cloud", "storage"],
+	"author": "solider245",
 	"license": "MIT",
 	"devDependencies": {
 		"@types/jest": "^30.0.0",
@@ -35,4 +35,3 @@
 		"undici": "^7.13.0"
 	}
 }
-

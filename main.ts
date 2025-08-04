@@ -27,14 +27,14 @@ import { installPasteHandler } from './src/paste/installPasteHandler';
 // 仍暂时直接引用 optimistic 原路径，后续收敛到 core 再从 index 导出
 import * as optimistic from './src/uploader/optimistic';
 
-export default class ObS3GeminiPlugin extends Plugin {
+export default class S3BridgePlugin extends Plugin {
   async onload() {
     await registerBuiltinPacksAndLoad(this);
 
     this.addSettingTab(new MyPluginSettingTab(this.app, this, DEFAULT_SETTINGS));
 
     try {
-      const ribbon = this.addRibbonIcon('cloud', t('S3 Uploader'), async () => {
+      const ribbon = this.addRibbonIcon('cloud', t('S3 Bridge'), async () => {
         try {
           // @ts-ignore
           if (this.app?.setting?.open) this.app.setting.open();
@@ -48,7 +48,7 @@ export default class ObS3GeminiPlugin extends Plugin {
           new Notice(tp('Operation failed: {error}', { error: e?.message ?? String(e) }));
         }
       });
-      ribbon?.setAttr('aria-label', t('S3 Uploader'));
+      ribbon?.setAttr('aria-label', t('S3 Bridge'));
     } catch (e) {
       console.warn('[ob-s3-gemini] addRibbonIcon failed:', e);
     }
@@ -114,7 +114,7 @@ export default class ObS3GeminiPlugin extends Plugin {
     try {
       // 仅记录生命周期事件，便于压力测试观察是否存在多次卸载或未清理的幽灵监听
       // 使用结构化日志，后续如发现非托管资源，可在此处补充显式卸载
-      console.info('[ob-s3-gemini][lifecycle] onunload invoked');
+    console.info('[obsidian-s3-bridge][lifecycle] onunload invoked');
     } catch { /* ignore logging errors */ }
   }
 }

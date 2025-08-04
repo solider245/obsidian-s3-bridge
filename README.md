@@ -1,96 +1,61 @@
-# Obsidian Sample Plugin
+# Obsidian S3-Bridge
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+将粘贴的图片与文件自动上传到兼容 S3 的对象存储（AWS S3 / Cloudflare R2 / MinIO 等），并在笔记中插入可访问链接。提供上传占位、失败重试、尺寸阈值校验、自定义对象键等能力，专为 Obsidian 编辑体验优化。
 
-This project uses TypeScript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in TypeScript Definition format, which contains TSDoc comments describing what it does.
+## 功能特性
+- 粘贴即上传：在编辑器中粘贴图片/文件，自动上传并插入链接
+- 预签名直传：使用预签名 URL 通过 HTTPS PUT 上传，安全高效
+- 乐观占位：上传中以占位 Markdown 展示，完成后自动替换为最终链接
+- 一键重试：失败时在编辑区提供“重试”入口，无需重新粘贴
+- 自定义对象键：支持前缀/命名格式定制，便于按日期或路径归档
+- 尺寸阈值：粘贴前进行大小校验，可提示确认或阻止
+- 多端兼容：支持 AWS S3 / Cloudflare R2 / MinIO 等 S3 兼容服务
+- 本地化：内置 i18n，支持中文等语言
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open Sample Modal" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and output 'click' to the console.
-- Registers a global interval which logs 'setInterval' to the console.
+## 安装
+1. 从 Releases 下载 `manifest.json`、`main.js`、`styles.css`
+2. 将文件复制到你的库：`<Vault>/.obsidian/plugins/obsidian-s3-bridge/`
+3. 在 Obsidian 设置 -> 社区插件中启用该插件
 
-## First time developing plugins?
+## 快速开始
+1. 打开设置，进入 “Obsidian S3-Bridge”
+2. 配置你的 S3 兼容存储参数（可参考 `config/s3Config.example.json`）
+3. 在编辑器中粘贴图片或文件，等待链接自动插入
 
-Quick starting guide for new plugin devs:
+## 配置说明
+核心配置涉及以下字段（不同后端可能略有差异）：
+- Endpoint / Region：对象存储服务的访问端点与区域
+- Bucket：目标存储桶
+- Access Key / Secret Key：访问凭证（如使用预签名，仅需在生成端配置）
+- Key Prefix：对象键前缀，可用于按日期/路径分组
+- Public URL/Domain：公开访问域名，用于生成可访问的外链
+- Size Limit：单次上传的大小阈值（超过将提示或阻止）
 
-- Check if [someone already developed a plugin for what you want](https://obsidian.md/plugins)! There might be an existing plugin similar enough that you can partner up with.
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `main.ts` to `main.js`.
-- Make changes to `main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
+示例文件：`config/s3Config.example.json`
 
-## Releasing new releases
+## 使用
+- 粘贴上传：在编辑器中直接粘贴图片/文件
+- 重试上传：当上传失败时，点击编辑区的重试提示
+- 命令面板：可在命令面板搜索 S3 相关命令（如手动触发上传/粘贴处理）
 
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments. Note: The manifest.json file must be in two places, first the root path of your repository and also in the release.
-- Publish the release.
+## 常见问题
+- 无法访问外链：请检查 Public URL/Domain 是否指向正确的桶与路径，并确保对象为公共可读
+- 鉴权失败：确认预签名有效且时间未过期，或访问密钥正确
+- 文件过大：按需调整 Size Limit，或在粘贴前压缩图片
 
-> You can simplify the version bump process by running `npm version patch`, `npm version minor` or `npm version major` after updating `minAppVersion` manually in `manifest.json`.
-> The command will bump version in `manifest.json` and `package.json`, and add the entry for the new version to `versions.json`
+## 版本与兼容性
+- 插件版本：见 `manifest.json`
+- 最低 Obsidian 版本：`0.15.0`
 
-## Adding your plugin to the community plugin list
+## 开发与构建
+- Node.js >= 16
+- 安装依赖：`npm i`
+- 开发构建：`npm run dev`
+- 生产构建：`npm run build`
+- 单元测试：`npm run test`
 
-- Check the [plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines).
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
+## 许可证
+MIT
 
-## How to use
-
-- Clone this repo.
-- Make sure your NodeJS is at least v16 (`node --version`).
-- `npm i` or `yarn` to install dependencies.
-- `npm run dev` to start compilation in watch mode.
-
-## Manually installing the plugin
-
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
-
-## Improve code quality with eslint (optional)
-- [ESLint](https://eslint.org/) is a tool that analyzes your code to quickly find problems. You can run ESLint against your plugin to find common bugs and ways to improve your code. 
-- To use eslint with this project, make sure to install eslint from terminal:
-  - `npm install -g eslint`
-- To use eslint to analyze this project use this command:
-  - `eslint main.ts`
-  - eslint will then create a report with suggestions for code improvement by file and line number.
-- If your source code is in a folder, such as `src`, you can use eslint with this command to analyze all files in that folder:
-  - `eslint .\src\`
-
-## Funding URL
-
-You can include funding URLs where people who use your plugin can financially support it.
-
-The simple way is to set the `fundingUrl` field to your link in your `manifest.json` file:
-
-```json
-{
-    "fundingUrl": "https://buymeacoffee.com"
-}
-```
-
-If you have multiple URLs, you can also do:
-
-```json
-{
-    "fundingUrl": {
-        "Buy Me a Coffee": "https://buymeacoffee.com",
-        "GitHub Sponsor": "https://github.com/sponsors",
-        "Patreon": "https://www.patreon.com/"
-    }
-}
-```
-
-## API Documentation
-
-See https://github.com/obsidianmd/obsidian-api
-
-添加了远程仓库
+## 致谢
+基于 Obsidian 插件 API 与 AWS SDK 开发，感谢社区提供的示例与文档。

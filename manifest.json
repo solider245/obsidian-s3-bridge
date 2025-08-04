@@ -1,12 +1,11 @@
 {
-  "id": "ob-s3-gemini",
-  "name": "ob-s3-gemini",
+  "id": "obsidian-s3-bridge",
+  "name": "Obsidian S3-Bridge",
   "version": "1.0.0",
   "minAppVersion": "0.15.0",
-  "description": "S3 上传与直链生成，支持 Cloudflare R2 / MinIO / AWS S3 等兼容端点。",
-  "author": "ob-s3-gemini",
-  "authorUrl": "https://github.com/your-repo",
-  "fundingUrl": "https://obsidian.md/pricing",
-  "isDesktopOnly": false,
+  "description": "自动将粘贴的图片与文件上传到兼容 S3 的对象存储（AWS S3 / Cloudflare R2 / MinIO 等），并在笔记中插入可访问链接。",
+  "author": "solider245",
+  "authorUrl": "https://github.com/solider245",
+  "isDesktopOnly": true,
   "main": "main.js"
 }
