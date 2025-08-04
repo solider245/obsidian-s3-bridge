@@ -229,14 +229,74 @@ export async function processNext(plugin: Plugin): Promise<{ processed: boolean 
     new Notice(tp('Upload failed: {error}', { error: 'Local temp missing and no cache' }));
     return { processed: false };
   }
-  const url = await performUpload(plugin, {
-    key,
-    mime: item.mime || 'application/octet-stream',
-    base64: finalBase64,
-  });
+  let url: string | null = null;
+  try {
+    url = await performUpload(plugin, {
+      key,
+      mime: item.mime || 'application/octet-stream',
+      base64: finalBase64,
+    });
+  } catch (e:any) {
+    // 失败时：更新历史记录为 failed 并写入 error，保留队列项以便后续重试
+    try {
+      const keyHist = 'obS3Uploader.history';
+      const raw = localStorage.getItem(keyHist) ?? '[]';
+      const arr = Array.isArray(JSON.parse(raw)) ? JSON.parse(raw) : [];
+      const idx = arr.findIndex((x:any) => x && x.id === item.id);
+      const errMsg = e?.message ?? String(e);
+      if (idx >= 0) {
+        arr[idx].status = 'failed';
+        arr[idx].error = errMsg;
+        if (!arr[idx].key) arr[idx].key = key;
+        localStorage.setItem(keyHist, JSON.stringify(arr.slice(0, 200)));
+      } else {
+        arr.unshift({
+          id: item.id,
+          fileName: item.filename,
+          mime: item.mime,
+          size: item.size,
+          time: Date.now(),
+          url: null,
+          key,
+          status: 'failed',
+          error: errMsg
+        });
+        localStorage.setItem(keyHist, JSON.stringify(arr.slice(0, 200)));
+      }
+    } catch { /* ignore history errors */ }
+    throw e;
+  }
 
   // 编辑器替换占位（粘贴阶段地址零处理；此处只在上传成功后用云端链接替换）
-  replaceInEditor(plugin, item.id, url, item.filename);
+  replaceInEditor(plugin, item.id, url || '', item.filename);
+
+  // 成功后：同步更新“上传历史”中对应 id 的记录为 success，并填充 url/key
+  try {
+    const keyHist = 'obS3Uploader.history';
+    const raw = localStorage.getItem(keyHist) ?? '[]';
+    const arr = Array.isArray(JSON.parse(raw)) ? JSON.parse(raw) : [];
+    const idx = arr.findIndex((e: any) => e && e.id === item.id);
+    if (idx >= 0) {
+      arr[idx].url = url;
+      arr[idx].key = key;
+      arr[idx].status = 'success';
+      if (!arr[idx].size && item.size) arr[idx].size = item.size;
+      if (!arr[idx].time && item.createdAt) arr[idx].time = item.createdAt;
+      localStorage.setItem(keyHist, JSON.stringify(arr.slice(0, 200)));
+    } else {
+      arr.unshift({
+        id: item.id,
+        fileName: item.filename,
+        mime: item.mime,
+        size: item.size,
+        time: Date.now(),
+        url,
+        key,
+        status: 'success'
+      });
+      localStorage.setItem(keyHist, JSON.stringify(arr.slice(0, 200)));
+    }
+  } catch { /* non-fatal */ }
 
   // 最简方案：不强制删除本地文件，避免误删；后续可加开关做清理
   try {
