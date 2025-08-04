@@ -1,60 +1,6 @@
 {
   "uploadQueue": [
     {
-      "id": "f14509db556f48e7",
-      "filename": "image.png",
-      "mime": "image/png",
-      "path": ".assets/temp_upload_1754310009544_03vo1t8dheh3.png?1754310009558",
-      "createdAt": 1754310009564,
-      "size": 50181,
-      "base64Length": 66908
-    },
-    {
-      "id": "3f3cd7593c57464e",
-      "filename": "image.png",
-      "mime": "image/png",
-      "path": ".assets/temp_upload_1754310009766_f8v6c0cmic.png?1754310009770",
-      "createdAt": 1754310009775,
-      "size": 50181,
-      "base64Length": 66908
-    },
-    {
-      "id": "e63b8c5850eb43b8",
-      "filename": "image.png",
-      "mime": "image/png",
-      "path": ".assets/temp_upload_1754310009886_f3qolw12d3q.png?1754310009891",
-      "createdAt": 1754310009896,
-      "size": 50181,
-      "base64Length": 66908
-    },
-    {
-      "id": "d6c5941c28cf4613",
-      "filename": "image.png",
-      "mime": "image/png",
-      "path": ".assets/temp_upload_1754310010182_rk4rky8da2.png?1754310010187",
-      "createdAt": 1754310010193,
-      "size": 50181,
-      "base64Length": 66908
-    },
-    {
-      "id": "e03e22bd5bfa4657",
-      "filename": "image.png",
-      "mime": "image/png",
-      "path": ".assets/temp_upload_1754310010520_aunmm2co5dp.png?1754310010525",
-      "createdAt": 1754310010531,
-      "size": 50181,
-      "base64Length": 66908
-    },
-    {
-      "id": "76b25ef989404706",
-      "filename": "image.png",
-      "mime": "image/png",
-      "path": ".assets/temp_upload_1754310010671_qsidoujt15.png?1754310010676",
-      "createdAt": 1754310010681,
-      "size": 50181,
-      "base64Length": 66908
-    },
-    {
       "id": "f939e2db494448b5",
       "filename": "image.png",
       "mime": "image/png",

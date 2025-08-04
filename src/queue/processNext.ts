@@ -28,10 +28,19 @@ async function loadQueue(plugin: Plugin): Promise<QueueItem[]> {
   return Array.isArray(existing.uploadQueue) ? (existing.uploadQueue as QueueItem[]) : [];
 }
 
+/**
+ * saveQueue 带轻量写入互斥，避免并发覆盖（同一渲染进程内）
+ */
 async function saveQueue(plugin: Plugin, list: QueueItem[]): Promise<void> {
-  const existing = (await (plugin as any).loadData()) ?? {};
-  (existing as any).uploadQueue = list;
-  await (plugin as any).saveData(existing);
+  const g: any = window as any;
+  if (!g.__obS3_savingQueue__) g.__obS3_savingQueue__ = Promise.resolve();
+  // 串行化：将本次写入拼接到前一次之后
+  g.__obS3_savingQueue__ = g.__obS3_savingQueue__.then(async () => {
+    const existing = (await (plugin as any).loadData()) ?? {};
+    (existing as any).uploadQueue = list;
+    await (plugin as any).saveData(existing);
+  }).catch(() => {/* 忽略前序错误，防止链条中断 */});
+  await g.__obS3_savingQueue__;
 }
 
 function replaceInEditor(plugin: Plugin, uploadId: string, url: string, fileLabel: string) {
@@ -79,9 +88,19 @@ async function readBase64For(plugin: Plugin, item: QueueItem): Promise<string | 
  * - 无队列或失败：返回 { processed:false }
  * - 成功：返回 { processed:true }
  */
+/**
+ * 进程级并发保护：命令与调度器共享
+ */
 export async function processNext(plugin: Plugin): Promise<{ processed: boolean }> {
-  const list = await loadQueue(plugin);
-  if (!list.length) return { processed: false };
+  const g: any = window as any;
+  if (g.__obS3_inflight_processNext__) {
+    // 已有一次处理在进行中，直接跳过
+    return { processed: false };
+  }
+  g.__obS3_inflight_processNext__ = true;
+  try {
+    const list = await loadQueue(plugin);
+    if (!list.length) return { processed: false };
 
   const item = list[0];
 
@@ -142,6 +161,9 @@ export async function processNext(plugin: Plugin): Promise<{ processed: boolean 
 
   new Notice(t('Upload successful!'));
   return { processed: true };
+  } finally {
+    try { (window as any).__obS3_inflight_processNext__ = false; } catch {}
+  }
 }
 
 export default { processNext };
