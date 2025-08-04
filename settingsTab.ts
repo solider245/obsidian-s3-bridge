@@ -107,6 +107,28 @@ export class MyPluginSettingTab extends PluginSettingTab {
     const profiles = listProfiles(this.plugin);
     const active = loadActiveProfile(this.plugin);
 
+    // 配置状态指示（小改动，大回报）
+    const status = (() => {
+      const miss: string[] = [];
+      const must: Array<keyof S3Profile> = ['bucketName', 'accessKeyId', 'secretAccessKey'];
+      // aws-s3 需要 region；其他类型可选
+      if (active?.providerType === 'aws-s3') must.push('region');
+      for (const k of must) if (!((active as any)?.[k])) miss.push(String(k));
+      // baseUrl 非必须，但给出提示
+      const ok = miss.length === 0;
+      return { ok, miss, warnBaseUrl: !active?.baseUrl };
+    })();
+
+    const stateBar = new Setting(containerEl)
+      .setName(t('Configuration Status'))
+      .setDesc(status.ok
+        ? (status.warnBaseUrl
+            ? t('OK, but Public Base URL is empty, direct links may be unavailable')
+            : t('OK'))
+        : tp('Missing: {keys}', { keys: status.miss.join(', ') })
+      );
+    stateBar.setClass?.('ob-s3-config-status');
+
     // 顶部：当前 Profile 选择与基础操作
     const header = new Setting(containerEl)
       .setName(t('Select Profile'))
@@ -334,77 +356,71 @@ export class MyPluginSettingTab extends PluginSettingTab {
         });
     });
 
+    // “Test Connection” 小改动：真正执行一次最小 PUT（预签名+上传），并给出友好提示与历史记录
     actions.addButton(btn => {
-      btn.setButtonText(t('Test Connection')).onClick(async (evt) => {
+      btn.setButtonText(t('Test Upload')).onClick(async (evt) => {
         const plugin = this.plugin;
         const cfg = loadS3Config(plugin);
 
-        // 按钮禁用，防止二次触发
         const buttonEl = (evt.currentTarget as HTMLElement) ?? null;
         const prevDisabled = (buttonEl as HTMLButtonElement)?.disabled ?? false;
-        if (buttonEl && 'disabled' in buttonEl) {
-          (buttonEl as HTMLButtonElement).disabled = true;
-        }
+        if (buttonEl && 'disabled' in buttonEl) (buttonEl as HTMLButtonElement).disabled = true;
 
-        // 生成随机测试 Key
+        // 生成最小测试对象
         const safePrefix = (cfg.keyPrefix ?? '').replace(/^\/+/, '').replace(/\/+$/,'');
         const prefixWithSlash = safePrefix ? `${safePrefix}/` : '';
         const testKey = `${prefixWithSlash}__ob_test__${Date.now()}_${Math.random().toString(36).slice(2)}.png`;
-
-        // 极小 PNG base64（1x1）
-        const tinyPngBase64 =
-          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAOQy5CwAAAAASUVORK5CYII=';
-
-        // 强拦截渲染端 R2 直连
-        const origFetch = (window as any).fetch?.bind(window);
-        const r2HostPatterns = [
-          /(^|\.)r2\.cloudflarestorage\.com$/i,
-          /(^|\.)r2\.dev$/i,
-        ];
-        const isR2Url = (urlStr: string) => {
-          try {
-            const u = new URL(urlStr, window.location.origin);
-            const host = u.hostname;
-            return r2HostPatterns.some(p => p.test(host));
-          } catch {
-            return false;
-          }
-        };
-        const installGuard = () => {
-          if (typeof window.fetch !== 'function' || !origFetch) return () => {};
-          (window as any).fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-            const urlStr = typeof input === 'string' ? input : (input as any)?.url ?? String(input);
-            if (isR2Url(urlStr)) {
-              console.warn('[ob-s3-gemini] Blocked renderer fetch to R2 during Test Connection:', urlStr);
-              return Promise.reject(new TypeError('Blocked renderer fetch to R2 during Test Connection'));
-            }
-            return origFetch(input as any, init);
-          };
-          return () => {
-            (window as any).fetch = origFetch;
-          };
-        };
-        const removeGuard = installGuard();
+        const tinyPngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAOQy5CwAAAAASUVORK5CYII=';
+        const contentType = 'image/png';
+        const bytes = Math.floor(tinyPngBase64.length * 3 / 4);
 
         try {
-          // 统一走 Obsidian 命令，避免直接依赖 main 导出
-          this.app.workspace.trigger('execute-command', {
-            id: 'obs3gemini-test-connection'
-          } as any);
-        } catch (error) {
-          const msg = (error as Error)?.message || '';
-          if (msg.includes('Blocked renderer fetch to R2 during Test Connection')) {
-            console.warn('[ob-s3-gemini] Renderer fetch was blocked during Test Connection window; ignoring as non-fatal.');
-            new Notice('已阻断渲染端直连 R2（测试期），该提示不影响主进程连通性结果');
-          } else {
-            console.error('[ob-s3-gemini] Test Connection failed (main path):', error);
-            new Notice(tp('Connection test failed: {error}', { error: (error as Error).message }));
-          }
+          // 走与主流程一致的预签名+PUT路径
+          const [{ presignAndPutObject }] = await Promise.all([
+            import('./src/uploader/presignPut'),
+          ]);
+          const url = await presignAndPutObject(plugin as any, { key: testKey, contentType, bodyBase64: tinyPngBase64 });
+
+          new Notice(tp('Test upload succeeded: {bytes} bytes', { bytes: String(bytes) }));
+          // 记录到历史
+          try {
+            const key = 'obS3Uploader.history';
+            const raw = localStorage.getItem(key) ?? '[]';
+            const arr = Array.isArray(JSON.parse(raw)) ? JSON.parse(raw) : [];
+            arr.unshift({
+              id: `test-${Date.now()}`,
+              fileName: '__test__.png',
+              mime: contentType,
+              size: bytes,
+              time: Date.now(),
+              url,
+              key: testKey,
+              status: 'success'
+            });
+            localStorage.setItem(key, JSON.stringify(arr.slice(0, 200)));
+          } catch {}
+        } catch (e:any) {
+          new Notice(tp('Connection test failed: {error}', { error: e?.message ?? String(e) }));
+          // 记录失败到历史
+          try {
+            const key = 'obS3Uploader.history';
+            const raw = localStorage.getItem(key) ?? '[]';
+            const arr = Array.isArray(JSON.parse(raw)) ? JSON.parse(raw) : [];
+            arr.unshift({
+              id: `test-${Date.now()}`,
+              fileName: '__test__.png',
+              mime: contentType,
+              size: bytes,
+              time: Date.now(),
+              url: null,
+              key: testKey,
+              status: 'failed',
+              error: e?.message ?? String(e)
+            });
+            localStorage.setItem(key, JSON.stringify(arr.slice(0, 200)));
+          } catch {}
         } finally {
-          try { removeGuard && removeGuard(); } catch {}
-          if (buttonEl && 'disabled' in buttonEl) {
-            (buttonEl as HTMLButtonElement).disabled = prevDisabled;
-          }
+          if (buttonEl && 'disabled' in buttonEl) (buttonEl as HTMLButtonElement).disabled = prevDisabled;
         }
       });
     });
@@ -639,29 +655,52 @@ export class MyPluginSettingTab extends PluginSettingTab {
 
       const list = historyContainer.createEl('div', { cls: 'ob-s3-history-list' });
 
-      history.slice(0, 50).forEach((item: any) => {
+      history.slice(0, 50).forEach((item: any, idx: number) => {
         const row = list.createEl('div', { cls: 'ob-s3-history-row' });
 
         const meta = row.createEl('div', { cls: 'ob-s3-history-meta' });
         const time = new Date(item.time ?? Date.now()).toLocaleString();
+        const humanSize = (() => {
+          const b = Number(item.size || 0);
+          const kb = b / 1024, mb = kb / 1024;
+          if (mb >= 1) return `${mb.toFixed(2)} MB`;
+          if (kb >= 1) return `${kb.toFixed(1)} KB`;
+          return `${b} B`;
+        })();
         meta.createEl('div', { text: item.fileName ?? t('(unknown file)') });
         meta.createEl('div', { text: item.key ? `Key: ${item.key}` : t('Key: -') });
         meta.createEl('div', { text: `${t('Time')}: ${time}` });
+        meta.createEl('div', { text: `${t('Size')}: ${humanSize}` });
+        meta.createEl('div', { text: `${t('Status')}: ${item.status || '-'}` });
 
         if (item.error) {
           const err = row.createEl('div', { cls: 'ob-s3-history-error' });
           err.createEl('span', { text: `${t('Error')}: ${item.error}` });
-        } else {
-          const linkWrap = row.createEl('div', { cls: 'ob-s3-history-link' });
+        }
+
+        const linkWrap = row.createEl('div', { cls: 'ob-s3-history-link' });
+        if (item.url) {
           const a = linkWrap.createEl('a', { text: item.url, href: item.url });
           a.target = '_blank';
-
           const btnCopy = linkWrap.createEl('button', { text: t('Copy') });
           btnCopy.onclick = async () => {
             await navigator.clipboard.writeText(item.url);
             new Notice(t('Link copied'));
           };
         }
+
+        // 移除记录（仅本地历史，不影响 S3）
+        const btnRemove = linkWrap.createEl('button', { text: t('Remove Record') });
+        btnRemove.onclick = () => {
+          try {
+            const key = 'obS3Uploader.history';
+            const raw = localStorage.getItem(key) ?? '[]';
+            const arr = Array.isArray(JSON.parse(raw)) ? JSON.parse(raw) : [];
+            const filtered = arr.filter((x: any, i: number) => i !== idx);
+            localStorage.setItem(key, JSON.stringify(filtered));
+            renderHistory();
+          } catch {}
+        };
       });
     };
     renderHistory();
