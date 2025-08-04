@@ -109,6 +109,12 @@ export default class ObS3GeminiPlugin extends Plugin {
       generateUploadId: optimistic.generateUploadId,
     });
   }
-
-  async onunload() {}
+ 
+  async onunload() {
+    try {
+      // 仅记录生命周期事件，便于压力测试观察是否存在多次卸载或未清理的幽灵监听
+      // 使用结构化日志，后续如发现非托管资源，可在此处补充显式卸载
+      console.info('[ob-s3-gemini][lifecycle] onunload invoked');
+    } catch { /* ignore logging errors */ }
+  }
 }

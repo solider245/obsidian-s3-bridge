@@ -84,10 +84,11 @@ export function installPasteHandler(ctx: PasteCtx): void {
             const ts = Date.now();
             const rand = Math.random().toString(36).slice(2);
             const safeDir = (tempDir as string).replace(/^\/+/, '');
-            const fileName = `${tempPrefix}${ts}_${rand}.${ext}`;
-
-            // 确保目录存在
+            // 同名后缀重试最多 3 次
+            const makeName = (n: number) => n === 0 ? `${tempPrefix}${ts}_${rand}.${ext}` : `${tempPrefix}${ts}_${rand}-${n}.${ext}`;
             const vault = plugin.app.vault as any;
+    
+            // 确保目录存在
             if (vault.adapter && typeof vault.adapter.mkdir === 'function') {
               try {
                 await vault.adapter.mkdir(safeDir);
@@ -97,60 +98,80 @@ export function installPasteHandler(ctx: PasteCtx): void {
             } else {
               try { await plugin.app.vault.createFolder(safeDir); } catch {}
             }
-
-            const fullPath = `${safeDir}/${fileName}`;
-            const bin = Buffer.from(base64, 'base64');
-
+    
             const hasCreateBinary = typeof (vault as any).createBinary === 'function';
             const hasModifyBinary = typeof (vault as any).modifyBinary === 'function';
-
-            const existing = plugin.app.vault.getAbstractFileByPath(fullPath);
-            if (!existing) {
+            const bin = Buffer.from(base64, 'base64');
+    
+            let finalFullPath = '';
+            let lastErr: any = null;
+            for (let attempt = 0; attempt < 4; attempt++) {
+              const fileName = makeName(attempt);
+              const fullPath = `${safeDir}/${fileName}`;
+              const existing = plugin.app.vault.getAbstractFileByPath(fullPath);
               try {
-                if (hasCreateBinary) {
-                  await (vault as any).createBinary(fullPath, bin);
-                } else {
-                  await plugin.app.vault.create(fullPath, bin.toString('binary'));
-                }
-              } catch {
-                const again = plugin.app.vault.getAbstractFileByPath(fullPath);
-                // @ts-ignore TFile 原型安全检测
-                if (again && again instanceof (window as any).app.vault.constructor.prototype.constructor.TFile) {
-                  if (hasModifyBinary) {
-                    await (vault as any).modifyBinary(again, bin);
+                if (!existing) {
+                  if (hasCreateBinary) {
+                    await (vault as any).createBinary(fullPath, bin);
                   } else {
-                    await plugin.app.vault.modify(again as any, bin.toString('binary'));
+                    await plugin.app.vault.create(fullPath, bin.toString('binary'));
                   }
+                  finalFullPath = fullPath;
+                  break;
                 } else {
-                  await plugin.app.vault.create(fullPath, bin.toString('binary'));
+                  // @ts-ignore TFile 原型安全检测
+                  if (existing instanceof (window as any).app.vault.constructor.prototype.constructor.TFile) {
+                    if (hasModifyBinary) {
+                      await (vault as any).modifyBinary(existing, bin);
+                    } else {
+                      await plugin.app.vault.modify(existing as any, bin.toString('binary'));
+                    }
+                    finalFullPath = fullPath;
+                    break;
+                  }
                 }
-              }
-            } else {
-              // @ts-ignore TFile 原型安全检测
-              if (existing instanceof (window as any).app.vault.constructor.prototype.constructor.TFile) {
-                if (hasModifyBinary) {
-                  await (vault as any).modifyBinary(existing, bin);
-                } else {
-                  await plugin.app.vault.modify(existing as any, bin.toString('binary'));
-                }
+              } catch (err) {
+                lastErr = err;
+                // 尝试下一个后缀
               }
             }
-
-            previewUrl = fullPath;
-
-            optimistic.cacheUploadPayload(uploadId, { base64, mime, fileName: file.name || undefined });
-            try {
-              const mark = (window as any).__obS3_tempFiles__ as Map<string, string> | undefined;
-              if (!mark) (window as any).__obS3_tempFiles__ = new Map<string, string>();
-              ((window as any).__obS3_tempFiles__ as Map<string, string>).set(uploadId, fullPath);
-            } catch {}
+    
+            if (!finalFullPath) {
+              // 所有尝试都失败，回退为 blob 预览
+              const blobUrl = URL.createObjectURL(file);
+              previewUrl = blobUrl;
+              new Notice(tp('Local temp file write failed, fallback to blob: {error}', { error: (lastErr as any)?.message ?? String(lastErr) }));
+            } else {
+              previewUrl = finalFullPath;
+              optimistic.cacheUploadPayload(uploadId, { base64, mime, fileName: file.name || undefined });
+              try {
+                const mark = (window as any).__obS3_tempFiles__ as Map<string, string> | undefined;
+                if (!mark) (window as any).__obS3_tempFiles__ = new Map<string, string>();
+                ((window as any).__obS3_tempFiles__ as Map<string, string>).set(uploadId, finalFullPath);
+              } catch {}
+            }
           } catch (e: any) {
             const blobUrl = URL.createObjectURL(file);
             previewUrl = blobUrl;
             new Notice(tp('Local temp file write failed, fallback to blob: {error}', { error: e?.message ?? String(e) }));
           }
         }
-
+    
+        // 将占位链接转换为 app 资源路径，避免“找不到 .assets 文件”提示
+        try {
+          const useAppLink = enableTempLocal
+            && typeof (plugin.app as any)?.vault?.adapter?.getResourcePath === 'function'
+            && previewUrl
+            && !previewUrl.startsWith('blob:')
+            && !previewUrl.startsWith('app://');
+          if (useAppLink) {
+            const abs = (plugin.app.vault as any).adapter.getResourcePath(previewUrl);
+            if (abs && typeof abs === 'string') {
+              previewUrl = abs;
+            }
+          }
+        } catch {}
+    
         const placeholderMd = optimistic.buildUploadingMarkdown(uploadId, previewUrl);
         editor.replaceSelection(placeholderMd);
 
@@ -160,49 +181,14 @@ export function installPasteHandler(ctx: PasteCtx): void {
         }
 
         // 3) 异步上传与最终替换/清理
-        (async () => {
-          try {
-            const ext = getExt(mime);
-            const cfgNow = await loadS3Config(plugin);
-            const keyPrefix = (cfgNow.keyPrefix || '').replace(/^\/+|\/+$/g, '');
-            const key = makeObjectKey(file.name || null, ext, keyPrefix, uploadId, (window as any).__obS3_keyPrefixFormat__);
-
-            const url = await performUpload(plugin, {
-              key,
-              mime,
-              base64,
-              presignTimeoutMs: Math.max(1000, Number((window as any).__obS3_presignTimeout__ ?? 10000)),
-              uploadTimeoutMs: Math.max(1000, Number((window as any).__obS3_uploadTimeout__ ?? 25000)),
-            });
-
-            optimistic.findAndReplaceByUploadId(editor, uploadId, () => `![](${url})`);
-            optimistic.removeUploadPayload(uploadId);
-
-            if (!enableTempLocal && previewUrl.startsWith('blob:')) {
-              try { URL.revokeObjectURL(previewUrl); } catch {}
-            }
-            if (enableTempLocal) {
-              try {
-                const localMap = (window as any).__obS3_tempFiles__ as Map<string, string> | undefined;
-                const fullPath = localMap?.get(uploadId);
-                if (fullPath) {
-                  const file = plugin.app.vault.getAbstractFileByPath(fullPath);
-                  if (file) {
-                    await plugin.app.vault.delete(file);
-                  } else {
-                    await plugin.app.vault.adapter.remove(fullPath);
-                  }
-                  if (localMap) localMap.delete(uploadId);
-                }
-              } catch {}
-            }
-          } catch {
-            optimistic.findAndReplaceByUploadId(editor, uploadId, () => optimistic.buildFailedMarkdown(uploadId));
-            if (!enableTempLocal && previewUrl.startsWith('blob:')) {
-              try { URL.revokeObjectURL(previewUrl); } catch {}
-            }
-          }
-        })();
+        // ===== STAGE-1 ABSOLUTE ISOLATION =====
+        // 已根据策略暂时屏蔽“异步上传与最终替换/清理”逻辑，确保仅验证本地写入的 100% 成功率。
+        // 占位已插入，内存缓存已建立；此处不再执行网络上传，避免干扰压力测试。
+        try {
+          // 结构化日志，便于观察是否出现重复触发
+          console.info('[ob-s3-gemini][isolation] paste handled without upload', { uploadId, enableTempLocal, previewUrl });
+        } catch {}
+        // ======================================
       } catch (e: any) {
         new Notice(tp('Upload failed: {error}', { error: e?.message ?? String(e) }));
       }
