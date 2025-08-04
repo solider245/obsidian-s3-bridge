@@ -183,21 +183,36 @@ export default class ObS3GeminiPlugin extends Plugin {
         const ext = getFileExtensionFromMime(payload.mime || 'application/octet-stream');
         const key = makeObjectKey(payload.fileName || null, ext, keyPrefix, uploadId, (window as any).__obS3_keyPrefixFormat__);
 
+        // 计时开始（重试路径）
+        const __t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
         const publicUrl = await presignAndPutObject(this, {
           key,
           contentType: payload.mime || 'application/octet-stream',
           bodyBase64: payload.base64,
           presignTimeoutMs: Math.max(1000, Number((window as any).__obS3_presignTimeout__ ?? 10000)),
           uploadTimeoutMs: Math.max(1000, Number((window as any).__obS3_uploadTimeout__ ?? 25000)),
+        }).then((u) => {
+          const __t1 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+          const sec = Math.max(0, (__t1 - __t0) / 1000);
+          try { console.info('[ob-s3-gemini] retry upload success', { uploadId, key, durationSec: Number(sec.toFixed(3)) }); } catch {}
+          try { new Notice(`上传成功！耗时 ${sec.toFixed(1)} 秒`); } catch {}
+          return u;
+        }).catch((e) => {
+          const __t1 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+          const sec = Math.max(0, (__t1 - __t0) / 1000);
+          try { console.error('[ob-s3-gemini] retry upload failed', { uploadId, key, durationSec: Number(sec.toFixed(3)), error: (e as any)?.message }); } catch {}
+          // 在上层 catch 仍会提示失败，这里不吞错误
+          throw e;
         });
 
         // 成功：替换最终 URL，清理缓存
         optimistic.findAndReplaceByUploadId(editor, uploadId, () => `![](${publicUrl})`);
         optimistic.removeUploadPayload(uploadId);
-        new Notice(t('Upload successful!'));
+        // 已在 then 中提示“上传成功！耗时 X.X 秒”，此处不再重复 Notice
       } catch (e:any) {
         // 失败：回落为失败占位，保留缓存以便再次点击重试
         optimistic.findAndReplaceByUploadId(editor, uploadId, () => optimistic.buildFailedMarkdown(uploadId));
+        // 统一失败提示（重试入口无法直接拿到 t0，这里只提示失败原因；粘贴/命令入口会有耗时）
         new Notice(tp('Upload failed: {error}', { error: e?.message ?? String(e) }));
       }
     });
@@ -265,10 +280,24 @@ export default class ObS3GeminiPlugin extends Plugin {
           const uploadId = optimistic.generateUploadId();
           const key = makeObjectKey(choice.name || null, ext, keyPrefix, uploadId, (window as any).__obS3_keyPrefixFormat__);
 
+          // 计时开始（本地文件命令）
+          const __t0_cmd = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
           const publicUrl = await presignAndPutObject(this, {
             key,
             contentType: mime,
             bodyBase64: base64,
+          }).then((u) => {
+            const __t1_cmd = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+            const sec = Math.max(0, (__t1_cmd - __t0_cmd) / 1000);
+            try { console.info('[ob-s3-gemini] command upload success', { key, durationSec: Number(sec.toFixed(3)) }); } catch {}
+            try { new Notice(`上传成功！耗时 ${sec.toFixed(1)} 秒`); } catch {}
+            return u;
+          }).catch((e) => {
+            const __t1_cmd = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+            const sec = Math.max(0, (__t1_cmd - __t0_cmd) / 1000);
+            try { console.error('[ob-s3-gemini] command upload failed', { key, durationSec: Number(sec.toFixed(3)), error: (e as any)?.message }); } catch {}
+            new Notice(`上传失败（耗时 ${sec.toFixed(1)} 秒）：${e?.message ?? e}`);
+            throw e;
           });
 
           // 插入策略：图片仍为 Markdown 图片，其他统一为纯链接
@@ -282,8 +311,9 @@ export default class ObS3GeminiPlugin extends Plugin {
               editor.replaceSelection(`[${safeName}](${publicUrl})`);
             }
           }
-          new Notice(t('Upload successful!'));
+          // 成功提示已在 then 中输出带耗时版本，这里无需重复
         } catch (e: any) {
+          // 错误提示在 then/catch 已输出含耗时版本，这里作为兜底
           new Notice(tp('Upload failed: {error}', { error: e?.message ?? String(e) }));
         }
       },
@@ -326,12 +356,26 @@ export default class ObS3GeminiPlugin extends Plugin {
           const ext = getFileExtensionFromMime(clip.mime);
           const uploadId = optimistic.generateUploadId();
           const key = makeObjectKey(null, ext, keyPrefix, uploadId, (window as any).__obS3_keyPrefixFormat__);
+          // 计时开始（剪贴板命令）
+          const __t0_cb = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
           const publicUrl = await presignAndPutObject(this, {
             key,
             contentType: clip.mime || 'application/octet-stream',
             bodyBase64: clip.base64,
             presignTimeoutMs: Math.max(1000, Number((window as any).__obS3_presignTimeout__ ?? 10000)),
             uploadTimeoutMs: Math.max(1000, Number((window as any).__obS3_uploadTimeout__ ?? 25000)),
+          }).then((u) => {
+            const __t1_cb = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+            const sec = Math.max(0, (__t1_cb - __t0_cb) / 1000);
+            try { console.info('[ob-s3-gemini] clipboard upload success', { key, durationSec: Number(sec.toFixed(3)) }); } catch {}
+            try { new Notice(`上传成功！耗时 ${sec.toFixed(1)} 秒`); } catch {}
+            return u;
+          }).catch((e) => {
+            const __t1_cb = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+            const sec = Math.max(0, (__t1_cb - __t0_cb) / 1000);
+            try { console.error('[ob-s3-gemini] clipboard upload failed', { key, durationSec: Number(sec.toFixed(3)), error: (e as any)?.message }); } catch {}
+            new Notice(`上传失败（耗时 ${sec.toFixed(1)} 秒）：${e?.message ?? e}`);
+            throw e;
           });
 
           const md = `![](${publicUrl})`;
@@ -340,7 +384,7 @@ export default class ObS3GeminiPlugin extends Plugin {
             const editor: Editor = view.editor;
             editor.replaceSelection(md);
           }
-          new Notice(t('Upload successful!'));
+          // 成功提示已在 then 中输出带耗时版本，这里不再重复
         } catch (e: any) {
           new Notice(tp('Upload failed: {error}', { error: e?.message ?? String(e) }));
         }
@@ -497,12 +541,26 @@ export default class ObS3GeminiPlugin extends Plugin {
               // 使用 uploadId + 可选日期格式，确保唯一且便于归档
               const key = makeObjectKey(file.name || null, ext, keyPrefix, uploadId, (window as any).__obS3_keyPrefixFormat__);
 
+              // 计时开始（粘贴上传）
+              const __t0_paste = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
               const publicUrl = await presignAndPutObject(this, {
                 key,
                 contentType: mime,
                 bodyBase64: base64,
                 presignTimeoutMs: Math.max(1000, Number((window as any).__obS3_presignTimeout__ ?? 10000)),
                 uploadTimeoutMs: Math.max(1000, Number((window as any).__obS3_uploadTimeout__ ?? 25000)),
+              }).then((u) => {
+                const __t1_paste = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+                const sec = Math.max(0, (__t1_paste - __t0_paste) / 1000);
+                try { console.info('[ob-s3-gemini] paste upload success', { uploadId, key, durationSec: Number(sec.toFixed(3)) }); } catch {}
+                try { new Notice(`上传成功！耗时 ${sec.toFixed(1)} 秒`); } catch {}
+                return u;
+              }).catch((e) => {
+                const __t1_paste = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+                const sec = Math.max(0, (__t1_paste - __t0_paste) / 1000);
+                try { console.error('[ob-s3-gemini] paste upload failed', { uploadId, key, durationSec: Number(sec.toFixed(3)), error: (e as any)?.message }); } catch {}
+                new Notice(`上传失败（耗时 ${sec.toFixed(1)} 秒）：${e?.message ?? e}`);
+                throw e;
               });
 
               // 成功：替换为最终 URL，并释放本地资源与缓存
@@ -529,14 +587,14 @@ export default class ObS3GeminiPlugin extends Plugin {
                   }
                 } catch {}
               }
-              new Notice(t('Upload successful!'));
+              // 成功提示已在 then 中输出带耗时版本，这里无需重复
             } catch (e:any) {
               // 失败：替换为失败占位；释放 blob；临时文件保留以便清理或复用
               optimistic.findAndReplaceByUploadId(editor, uploadId, () => optimistic.buildFailedMarkdown(uploadId));
               if (!enableTempLocal && previewUrl.startsWith('blob:')) {
                 try { URL.revokeObjectURL(previewUrl); } catch {}
               }
-              new Notice(tp('Upload failed: {error}', { error: e?.message ?? String(e) }));
+              // 失败提示已在 catch 中输出带耗时版本，这里无需重复
             }
           })();
         } catch (e: any) {
