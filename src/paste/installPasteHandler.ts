@@ -25,7 +25,10 @@ type QueueItem = {
   id: string;              // uploadId
   filename: string;        // 临时文件名或原始文件名
   mime: string;
-  path: string;            // vault 内路径（如 .assets/xxx.png）
+  // 最简方案：存储“当下即可用”的预览地址（blob: 或 vault 相对路径），后续仅在上传成功时替换为云端链接
+  previewUrl?: string;
+  // 兼容旧结构：不再依赖 path 读取，可置空
+  path: string;
   createdAt: number;       // Date.now()
   size?: number;           // 字节数（若可得）
   base64Length?: number;   // base64 字符长度
@@ -100,7 +103,11 @@ export function installPasteHandler(ctx: PasteCtx): void {
         })();
         const enableTempLocal = !!tempSettings.enableTempLocal;
         const tempPrefix = (tempSettings.tempPrefix || 'temp_upload_') as string;
-        const tempDir = (tempSettings.tempDir || '.assets') as string;
+        // 架构更新：统一写入 Vault 根的专属目录 /.obs3/assets
+        // 插入到笔记中的链接也统一为 "/.obs3/assets/xxx.png"
+        const OBS3_ROOT = '.obs3';
+        const OBS3_ASSETS = `${OBS3_ROOT}/assets`;
+        const tempDir = OBS3_ASSETS as string;
 
         // 1) 构造占位：blob 或 临时文件
         const uploadId = generateUploadId();
@@ -120,14 +127,22 @@ export function installPasteHandler(ctx: PasteCtx): void {
             // 同名后缀重试最多 3 次
             const makeName = (n: number) => n === 0 ? `${tempPrefix}${ts}_${rand}.${ext}` : `${tempPrefix}${ts}_${rand}-${n}.${ext}`;
             const vault = plugin.app.vault as any;
-    
-            // 确保目录存在
-            if (vault.adapter && typeof vault.adapter.mkdir === 'function') {
-              try {
-                await vault.adapter.mkdir(safeDir);
-              } catch {
-                try { await plugin.app.vault.createFolder(safeDir); } catch {}
+
+            // 确保目录 /.obs3 与 /.obs3/assets 存在（逐级创建）
+            try {
+              if (!(await plugin.app.vault.adapter.exists('.obs3'))) {
+                try { await plugin.app.vault.createFolder('.obs3'); } catch {}
               }
+            } catch {}
+            try {
+              if (!(await plugin.app.vault.adapter.exists('.obs3/assets'))) {
+                try { await plugin.app.vault.createFolder('.obs3/assets'); } catch {}
+              }
+            } catch {}
+
+            // 兜底：再尝试直接 mkdir safeDir
+            if (vault.adapter && typeof vault.adapter.mkdir === 'function') {
+              try { await vault.adapter.mkdir(safeDir); } catch {}
             } else {
               try { await plugin.app.vault.createFolder(safeDir); } catch {}
             }
@@ -175,9 +190,11 @@ export function installPasteHandler(ctx: PasteCtx): void {
               previewUrl = blobUrl;
               new Notice(tp('Local temp file write failed, fallback to blob: {error}', { error: (lastErr as any)?.message ?? String(lastErr) }));
             } else {
-              previewUrl = finalFullPath; // 注意：finalFullPath 是 vault 相对路径，如 ".assets/temp_upload_*.png"
-              // 无论是否启用临时模式，均缓存 base64 以便后续“手动处理”兜底可用
-              optimistic.cacheUploadPayload(uploadId, { base64, mime, fileName: file.name || undefined });
+              // 重要修正：Obsidian 资源解析遵循 “vault 相对路径（不以 / 开头）”
+              // 此处确保是以 ".obs3/assets/..." 开头的 vault 相对路径（而非 "./.obs3..." 或 "/.obs3..."）。
+              previewUrl = finalFullPath.replace(/^\.?\/?\.obs3\/assets\//, '.obs3/assets/');
+              // 强制双保险：始终覆盖写缓存与映射，确保后续读取稳定
+              try { optimistic.cacheUploadPayload(uploadId, { base64, mime, fileName: file.name || undefined }); } catch {}
               try {
                 const mark = (window as any).__obS3_tempFiles__ as Map<string, string> | undefined;
                 if (!mark) (window as any).__obS3_tempFiles__ = new Map<string, string>();
@@ -191,24 +208,13 @@ export function installPasteHandler(ctx: PasteCtx): void {
           }
         }
 
-        // 将占位链接转换为 app 资源路径，避免“找不到 .assets 文件”提示
-        // 注意：当启用临时附件且我们已拿到 vault 相对路径(finalFullPath)时，previewUrl 即形如 ".assets/xxx.png"
-        // 这种情况下不要再转换为 app:// 资源 URL，否则队列 path 难以还原，命令侧也无法用 adapter 读取。
-        try {
-          const useAppLink =
-            !enableTempLocal // 仅非临时模式才转换（blob 或 http 预览）
-            && typeof (plugin.app as any)?.vault?.adapter?.getResourcePath === 'function'
-            && previewUrl
-            && !previewUrl.startsWith('blob:')
-            && !previewUrl.startsWith('app://');
-          if (useAppLink) {
-            const abs = (plugin.app.vault as any).adapter.getResourcePath(previewUrl);
-            if (abs && typeof abs === 'string') {
-              previewUrl = abs;
-            }
-          }
-        } catch {}
+        // 简化至“零转换”：粘贴后不对图片地址做任何处理
+        // - 非临时模式：previewUrl 是 blob:，直接用于占位
+        // - 临时模式：previewUrl 已是 vault 相对路径（如 ".obs3/assets/xxx.png"），保持不变，不再转 app:// 或相对化
+        // 统一遵循：占位里放当下拿到的原始 previewUrl，后续仅在“上传成功时”替换为云端链接
+        try { /* no-op: 保持 previewUrl 原样 */ } catch {}
 
+        // 重要：保持 vault 相对路径/原始 blob，不再转换为 app://
         const placeholderMd = optimistic.buildUploadingMarkdown(uploadId, previewUrl);
         editor.replaceSelection(placeholderMd);
  
@@ -218,21 +224,25 @@ export function installPasteHandler(ctx: PasteCtx): void {
             ? Number((file as any).size)
             : Math.floor((base64.length * 3) / 4);
  
-          // 保存“最原始、最准确”的 vault 相对路径：仅当启用临时附件且成功写入 finalFullPath
-          // 回看上文：当 enableTempLocal=true 且写入成功时，finalFullPath 被赋值并用于预览；否则 previewUrl 可能是 blob: 或 app:// 资源URL
+          // 队列仅记录“真实文件位置”，不依赖占位里用的链接形式
+          // - 临时模式：直接从映射取回写入时的 finalFullPath（形如 ".obs3/assets/xxx.png"）
+          // - 非临时：保持空，后续依赖缓存/重试
           const safeDir = (tempDir as string).replace(/^\/+/, '');
-          const pathForQueue =
-            enableTempLocal && typeof previewUrl === 'string' && !previewUrl.startsWith('blob:') && previewUrl.startsWith(safeDir + '/')
-              ? previewUrl /* 这里的 previewUrl 即 finalFullPath（示例：.assets/temp_upload_xxx.png） */
-              : '';
- 
+          // 最简方案：不依赖磁盘路径，统一置空；仅记录当下可用的 previewUrl
+          let pathForQueue = '';
+          try {
+            const m: Map<string, string> | undefined = (window as any).__obS3_tempFiles__;
+            const mapped = m?.get(uploadId);
+            // 如需兼容后续清理，可在此选择使用 mapped；现在先统一置空以避免“找不到”分歧
+            void mapped;
+          } catch {}
+
           const item = {
             id: uploadId,
             filename: (file.name || '').trim() || ((previewUrl.split('/').pop() || 'image')),
             mime,
-            // 若启用临时模式并成功写入，pathForQueue 即 ".assets/xxx.png"
-            // 若未成功，则置空，命令侧将从 optimistic 缓存读取
-            path: pathForQueue,
+            previewUrl, // 关键：把占位实际使用的地址直接写入 data.json
+            path: pathForQueue, // 置空，不依赖文件系统
             createdAt: Date.now(),
             size: approxBytes,
             base64Length: base64.length
@@ -248,14 +258,16 @@ export function installPasteHandler(ctx: PasteCtx): void {
         }
 
         // 3) 异步上传与最终替换/清理
-        // ===== STAGE-1 ABSOLUTE ISOLATION =====
-        // 已根据策略暂时屏蔽“异步上传与最终替换/清理”逻辑，确保仅验证本地写入的 100% 成功率。
-        // 占位已插入，内存缓存已建立；此处不再执行网络上传，避免干扰压力测试。
+        // 重新启用：粘贴后主动触发一次队列处理，确保占位尽快被云端 URL 替换
         try {
-          // 结构化日志，便于观察是否出现重复触发
-          console.info('[ob-s3-gemini][isolation] paste handled without upload', { uploadId, enableTempLocal, previewUrl });
-        } catch {}
-        // ======================================
+          const { processNext } = require('../queue/processNext') as typeof import('../queue/processNext');
+          // 由 processNext 内部的 __obS3_inflight_processNext__ 保证并发安全
+          processNext(plugin).catch((e: any) => {
+            try { console.warn('[ob-s3-gemini][paste] processNext failed after paste', { id: uploadId, err: e?.message }); } catch {}
+          });
+        } catch (e) {
+          try { console.warn('[ob-s3-gemini][paste] failed to trigger processNext', { id: uploadId, err: (e as any)?.message }); } catch {}
+        }
 
         // —— 入队后再补一条可观测日志 ——
         try { console.info('[ob-s3-gemini][queue] state snapshot stored via saveData'); } catch {}

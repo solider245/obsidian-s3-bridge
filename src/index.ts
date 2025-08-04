@@ -29,3 +29,30 @@ export { installRetryHandler } from './features/installRetryHandler';
 // 待迁移后补充：registerCommands, installPasteHandler
 // export { registerCommands } from './features/registerCommands';
 // export { installPasteHandler } from './features/installPasteHandler';
+
+/**
+ * 插件生命周期托管建议：
+ * - 不在 onload 自动启动任何调度器
+ * - 在 onunload 时，若命令模块内存在 scheduler 单例且正在运行，则进行幂等 stop
+ *
+ * 说明：
+ *   由于命令模块（registerCommands.ts）内部维护了一个模块级 scheduler 单例，
+ *   这里提供一个可选的帮助函数，供主入口在 onunload 时调用以确保清理。
+ */
+export async function __stopSchedulerIfRunning__(app: any) {
+  try {
+    // 延迟 require，避免循环依赖
+    const mod = require('./commands/registerCommands') as any;
+    if (!mod || !mod.getScheduler) {
+      return;
+    }
+    const plugin: any = (app as any)?._plugins?.activePlugin ?? { app };
+    const sch = mod.getScheduler?.(plugin);
+    if (sch && typeof sch.isRunning === 'function' && sch.isRunning()) {
+      sch.stop();
+      try { console.info('[ob-s3-gemini][lifecycle] scheduler stopped on unload'); } catch {}
+    }
+  } catch (e) {
+    try { console.warn('[ob-s3-gemini][lifecycle] stop scheduler failed', { err: (e as any)?.message }); } catch {}
+  }
+}
