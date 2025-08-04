@@ -210,7 +210,22 @@ export function installPasteHandler(ctx: PasteCtx): void {
         try { /* no-op: 保持 previewUrl 原样 */ } catch {}
 
         // 重要：保持 vault 相对路径/原始 blob，不再转换为 app://
-        const placeholderMd = optimistic.buildUploadingMarkdown(uploadId, previewUrl);
+        // 计算人类可读大小，放入占位，提升可见性
+        const approxBytesForLabel = typeof (file as any)?.size === 'number'
+          ? Number((file as any).size)
+          : Math.floor((base64.length * 3) / 4);
+        const humanSize = (() => {
+          const kb = approxBytesForLabel / 1024;
+          const mb = kb / 1024;
+          if (mb >= 1) return `${mb.toFixed(2)} MB`;
+          if (kb >= 1) return `${kb.toFixed(1)} KB`;
+          return `${approxBytesForLabel} B`;
+        })();
+
+        // 在占位里追加“大小”信息；不改变原有结构，避免影响查找/替换
+        const placeholderMd = optimistic.buildUploadingMarkdown(uploadId, previewUrl)
+          .replace(/!\[(Uploading\.\.\.)/, '![$1')
+          .replace(/\]\(#\)/, ` size=${humanSize}]()`);
         editor.replaceSelection(placeholderMd);
  
         // —— 入队：仅在隔离阶段追加队列，不触发上传 ——
@@ -243,6 +258,24 @@ export function installPasteHandler(ctx: PasteCtx): void {
             base64Length: base64.length
           } as QueueItem;
           await appendToQueue(plugin, item);
+
+          // 追加到本地“上传历史”，便于后续管理器/设置页展示（最多 200 条，成功/失败后会再更新 URL 与状态）
+          try {
+            const key = 'obS3Uploader.history';
+            const raw = localStorage.getItem(key) ?? '[]';
+            const arr = Array.isArray(JSON.parse(raw)) ? JSON.parse(raw) : [];
+            arr.unshift({
+              id: uploadId,
+              fileName: item.filename,
+              mime: item.mime,
+              size: item.size,
+              time: item.createdAt,
+              url: null,      // 成功后由上传流程填充
+              key: null,      // 成功后由上传流程填充（对象键）
+              status: 'queued'
+            });
+            localStorage.setItem(key, JSON.stringify(arr.slice(0, 200)));
+          } catch { /* non-fatal */ }
         } catch (e) {
           try { console.warn('[ob-s3-gemini][queue] append skipped', { id: uploadId, err: (e as any)?.message }); } catch {}
         }

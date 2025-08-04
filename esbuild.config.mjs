@@ -11,7 +11,7 @@ if you want to view the source, please visit the github repository of this plugi
 
 const prod = (process.argv[2] === "production");
 
-const context = await esbuild.context({
+const buildOptions = {
 	banner: {
 		js: banner,
 	},
@@ -31,7 +31,8 @@ const context = await esbuild.context({
 		"@lezer/common",
 		"@lezer/highlight",
 		"@lezer/lr",
-		...builtins],
+		...builtins
+	],
 	format: "cjs",
 	target: "es2018",
 	logLevel: "info",
@@ -39,10 +40,22 @@ const context = await esbuild.context({
 	treeShaking: true,
 	outfile: "main.js",
 	minify: prod,
-});
+	metafile: true
+};
+
+const context = await esbuild.context(buildOptions);
 
 if (prod) {
-	await context.rebuild();
+	const result = await context.rebuild();
+	// 输出体积分析（小改动，大收益）
+	try {
+		const analysis = await esbuild.analyzeMetafile(result.metafile, { verbose: true });
+		console.log('\n====== esbuild bundle analysis ======\n');
+		console.log(analysis);
+		console.log('\n=====================================\n');
+	} catch (e) {
+		console.warn('[build] analyzeMetafile failed:', e?.message || e);
+	}
 	process.exit(0);
 } else {
 	await context.watch();
