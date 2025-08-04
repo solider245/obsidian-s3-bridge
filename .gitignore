@@ -1,3 +1,12 @@
 # Ignore user-specific S3 config holding credentials
 config/s3Config.json
 node_modules
+# 构建产物
+main.js
+manifest.json
+
+# 依赖文件夹
+node_modules/
+
+# Obsidian 本地配置
+.obsidian/

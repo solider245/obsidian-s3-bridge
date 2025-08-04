@@ -14,10 +14,17 @@ import { Notice, Plugin } from 'obsidian';
 import { t, tp } from './src/l10n';
 import { MyPluginSettingTab, DEFAULT_SETTINGS } from './settingsTab';
 
-import { registerBuiltinPacksAndLoad } from './src/bootstrap/i18nBootstrap';
+// 统一从单一索引导入（分层聚合）
+import {
+  registerBuiltinPacksAndLoad,
+  installRetryHandler,
+} from './src/index';
+
+// 暂时仍直接从原路径显式导入，待后续迁移至 features 并由 index 再导出
 import { registerCommands } from './src/commands/registerCommands';
 import { installPasteHandler } from './src/paste/installPasteHandler';
-import { installRetryHandler } from './src/retry/installRetryHandler';
+
+// 仍暂时直接引用 optimistic 原路径，后续收敛到 core 再从 index 导出
 import * as optimistic from './src/uploader/optimistic';
 
 export default class ObS3GeminiPlugin extends Plugin {
@@ -57,16 +64,21 @@ export default class ObS3GeminiPlugin extends Plugin {
         // 仅在此发出占位切换信号；具体上传/替换由 optimistic 与 upload 模块完成
         optimistic.findAndReplaceByUploadId(editor, uploadId, () => `![${t('Uploading...')} ob-s3:id=${uploadId} status=uploading](#)`);
 
-        const [{ loadS3Config }, { performUpload }, { makeObjectKey }] = await Promise.all([
+        const [{ loadS3Config }, { presignAndPutObject }, { makeObjectKey }] = await Promise.all([
           import('./s3/s3Manager'),
-          import('./src/upload/performUpload'),
-          import('./src/objectKey/makeKey'),
+          import('./src/uploader/presignPut'),
+          import('./src/index'),
         ]);
         const cfg = await loadS3Config(this);
         const keyPrefix = (cfg.keyPrefix || '').replace(/^\/+|\/+$/g, '');
         const ext = (payload.mime || 'application/octet-stream').toLowerCase().includes('image/') ? (payload.mime.split('/')[1] || 'bin') : 'bin';
         const key = makeObjectKey(payload.fileName || null, ext, keyPrefix, uploadId, (window as any).__obS3_keyPrefixFormat__);
-        const url = await performUpload(this, { key, mime: payload.mime || 'application/octet-stream', base64: payload.base64 });
+        // 统一走预签名 + HTTPS PUT，再由 s3Manager 生成公开链接
+        const url = await presignAndPutObject(this, {
+          key,
+          contentType: payload.mime || 'application/octet-stream',
+          bodyBase64: payload.base64
+        });
 
         optimistic.findAndReplaceByUploadId(editor, uploadId, () => `![](${url})`);
         optimistic.removeUploadPayload(uploadId);
@@ -78,20 +90,21 @@ export default class ObS3GeminiPlugin extends Plugin {
     this.register(() => { try { retry.uninstall(); } catch {} });
 
     // 注册命令与粘贴处理（装配注入在其模块内部完成）
-    registerCommands({
+    // TODO: 待 registerCommands 收敛到 features 后改为从 ./src/index 导入
+    (require('./src/commands/registerCommands') as any).registerCommands({
       plugin: this,
       // 其余依赖在模块内动态导入，主入口不再直接关心实现细节
-      makeObjectKey: (...args: any[]) => (require('./src/objectKey/makeKey') as any).makeObjectKey(...args),
-      getExt: (mime: string) => (require('./src/mime/extension') as any).getFileExtensionFromMime(mime),
+      makeObjectKey: (...args: any[]) => (require('./src/index') as any).makeObjectKey(...args),
+      getExt: (mime: string) => (require('./src/core/mime') as any).getFileExtensionFromMime(mime),
       ensureWithinLimitOrConfirm: (bytes: number, limit?: number) => (require('./src/threshold/sizeGuard') as any).ensureWithinLimitOrConfirm(bytes, limit),
-      readClipboardImageAsBase64: () => (require('./src/clipboard/readClipboard') as any).readClipboardImageAsBase64(),
+      readClipboardImageAsBase64: () => (require('./src/core/readClipboard') as any).readClipboardImageAsBase64(),
       generateUploadId: optimistic.generateUploadId,
     });
 
-    installPasteHandler({
+    (require('./src/paste/installPasteHandler') as any).installPasteHandler({
       plugin: this,
-      getExt: (mime: string) => (require('./src/mime/extension') as any).getFileExtensionFromMime(mime),
-      makeObjectKey: (...args: any[]) => (require('./src/objectKey/makeKey') as any).makeObjectKey(...args),
+      getExt: (mime: string) => (require('./src/core/mime') as any).getFileExtensionFromMime(mime),
+      makeObjectKey: (...args: any[]) => (require('./src/index') as any).makeObjectKey(...args),
       ensureWithinLimitOrConfirm: (bytes: number, limit?: number) => (require('./src/threshold/sizeGuard') as any).ensureWithinLimitOrConfirm(bytes, limit),
       generateUploadId: optimistic.generateUploadId,
     });
