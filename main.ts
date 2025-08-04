@@ -120,25 +120,39 @@ export default class ObS3GeminiPlugin extends Plugin {
     const cfg = await loadS3Config(this);
     const keyPrefix = (cfg.keyPrefix || '').replace(/^\/+|\/+$/g, '');
 
-    // 安装“失败重试”点击拦截（乐观UI）
+    // 安装“失败重试”点击拦截（乐观UI + 内存缓存重试）
     const retryHandler = optimistic.handleRetryClickInEditor(this, async ({ editor, uploadId }) => {
       try {
-        // 从失败占位行中先切换回 uploading 占位（临时使用 # 链接，上传完成后用最终 URL 替换整段）
-        // 这里不再使用 blob 预览，因为失败后不再持有原始 blob；直接保持“上传中”文字占位
+        const payload = optimistic.takeUploadPayload(uploadId);
+        if (!payload) {
+          // 无缓存：提示用户重新粘贴
+          new Notice(tp('Upload failed: {error}', { error: t('Please paste again to retry upload') }));
+          return;
+        }
+
+        // 切换为“上传中”占位（采用临时占位链接 #）
         optimistic.findAndReplaceByUploadId(editor, uploadId, (_full, _line) => {
           const tempUploading = `![${t('Uploading...')} ob-s3:id=${uploadId} status=uploading](#)`;
           return tempUploading;
         });
 
-        // 无法重读剪贴板，此处首轮实现选择提示用户重新粘贴更稳妥
-        // 为保证闭环，先给出提示；后续第二阶段可引入内存 Map 缓存 uploadId->payload 以实现真正重试
-        new Notice(tp('Upload failed: {error}', { error: t('Please paste again to retry upload') }));
+        // 生成 key 并发起上传
+        const ext = getFileExtensionFromMime(payload.mime || 'application/octet-stream');
+        const key = makeObjectKey(payload.fileName || null, ext, keyPrefix);
 
-        // 将占位切换回 failed，保持可再次点击重试
-        optimistic.findAndReplaceByUploadId(editor, uploadId, (_full, _line) => {
-          return optimistic.buildFailedMarkdown(uploadId);
+        const publicUrl = await presignAndPutObject(this, {
+          key,
+          contentType: payload.mime || 'application/octet-stream',
+          bodyBase64: payload.base64,
         });
+
+        // 成功：替换最终 URL，清理缓存
+        optimistic.findAndReplaceByUploadId(editor, uploadId, () => `![](${publicUrl})`);
+        optimistic.removeUploadPayload(uploadId);
+        new Notice(t('Upload successful!'));
       } catch (e:any) {
+        // 失败：回落为失败占位，保留缓存以便再次点击重试
+        optimistic.findAndReplaceByUploadId(editor, uploadId, () => optimistic.buildFailedMarkdown(uploadId));
         new Notice(tp('Upload failed: {error}', { error: e?.message ?? String(e) }));
       }
     });
@@ -324,12 +338,15 @@ export default class ObS3GeminiPlugin extends Plugin {
           const placeholderMd = optimistic.buildUploadingMarkdown(uploadId, blobUrl);
           editor.replaceSelection(placeholderMd);
 
-          // 2) 异步上传
+          // 2) 读取文件到 base64，并写入内存缓存，供“重试”复用
+          const arrayBuffer = await file.arrayBuffer();
+          const base64 = Buffer.from(arrayBuffer).toString('base64');
+          const mime = file.type || 'application/octet-stream';
+          optimistic.cacheUploadPayload(uploadId, { base64, mime, fileName: file.name || undefined });
+
+          // 3) 异步上传
           (async () => {
             try {
-              const arrayBuffer = await file.arrayBuffer();
-              const base64 = Buffer.from(arrayBuffer).toString('base64');
-              const mime = file.type || 'application/octet-stream';
               const ext = getFileExtensionFromMime(mime);
               const key = makeObjectKey(file.name || null, ext, keyPrefix);
 
@@ -339,13 +356,14 @@ export default class ObS3GeminiPlugin extends Plugin {
                 bodyBase64: base64,
               });
 
-              // 成功：替换为最终 URL，并释放 blob URL
-              optimistic.findAndReplaceByUploadId(editor, uploadId, (_full, _line) => `![](${publicUrl})`);
+              // 成功：替换为最终 URL，并释放 blob URL与缓存
+              optimistic.findAndReplaceByUploadId(editor, uploadId, () => `![](${publicUrl})`);
+              optimistic.removeUploadPayload(uploadId);
               try { URL.revokeObjectURL(blobUrl); } catch {}
               new Notice(t('Upload successful!'));
             } catch (e:any) {
-              // 失败：替换为失败占位，并释放 blob URL
-              optimistic.findAndReplaceByUploadId(editor, uploadId, (_full, _line) => optimistic.buildFailedMarkdown(uploadId));
+              // 失败：替换为失败占位，并释放 blob URL（保留缓存以便一键重试）
+              optimistic.findAndReplaceByUploadId(editor, uploadId, () => optimistic.buildFailedMarkdown(uploadId));
               try { URL.revokeObjectURL(blobUrl); } catch {}
               new Notice(tp('Upload failed: {error}', { error: e?.message ?? String(e) }));
             }

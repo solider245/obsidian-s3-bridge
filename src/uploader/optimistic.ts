@@ -114,6 +114,26 @@ export function findAndReplaceByUploadId(
 }
 
 /**
+ * 内存缓存：支持“一键重试”
+ * 结构：uploadId -> { base64, mime, fileName }
+ */
+const __uploadPayloadCache: Map<string, { base64: string; mime: string; fileName?: string }> = new Map();
+
+export function cacheUploadPayload(uploadId: string, payload: { base64: string; mime: string; fileName?: string }) {
+  __uploadPayloadCache.set(uploadId, payload);
+}
+
+export function takeUploadPayload(uploadId: string): { base64: string; mime: string; fileName?: string } | undefined {
+  const val = __uploadPayloadCache.get(uploadId);
+  // 不在这里删除，调用方根据是否成功决定清理；也可选择 get 后保留
+  return val;
+}
+
+export function removeUploadPayload(uploadId: string) {
+  __uploadPayloadCache.delete(uploadId);
+}
+
+/**
  * 安装“重试”点击拦截（基于编辑器文本解析 + 光标/选区定位）
  * - 在活跃 Markdown 编辑器中，当点击位于形如 [重试](#) 的链接文本位置时，
  *   回查同一行是否包含 ob-s3:id=XXXXXXXXXXXXXX 的失败占位，若命中则触发 onRetry。
@@ -131,22 +151,16 @@ export function handleRetryClickInEditor(
       const editor: Editor = view.editor;
       if (!editor) return;
 
-      // 粗略判断：仅当点击近似链接区域时再进一步解析
-      // 无法直接从 DOM 取 a 标签，按约定当用户点击后，Obsidian 会将光标定位至链接文本附近
       setTimeout(() => {
         try {
           const pos = editor.getCursor();
           const lineText = editor.getLine(pos.line) ?? '';
-          // 只有同时包含 status=failed 与 [xxx](#) 的行才尝试匹配
           if (!lineText.includes('status=failed') || !lineText.includes('](#)')) return;
 
           const m = lineText.match(RE_FAILED);
           if (!m) return;
           const uploadId = m[1];
 
-          // 进一步检查光标是否大致落在重试链接附近（提高精准度）
-          // 简化：若行内存在 RE_FAILED 匹配且用户点击该行，则触发重试
-          // 如需更精细，可解析链接起止列范围，这里先保持简洁
           evt.preventDefault();
           evt.stopPropagation();
           onRetry({ editor, uploadId });
@@ -155,8 +169,6 @@ export function handleRetryClickInEditor(
     } catch { /* ignore */ }
   };
 
-  // 监听当前文档级别的鼠标事件（尽量限制在编辑区域）
-  // 使用 activeLeaf 的 containerEl，以减少对全局的影响
   const leaf = plugin.app.workspace.activeLeaf as any;
   const containerEl: HTMLElement = (leaf?.view?.containerEl as HTMLElement)
     ?? (plugin.app.workspace as any)?.containerEl
