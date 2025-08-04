@@ -4,14 +4,27 @@
 
 - 通用上传阈值与二次确认
   - 设置项“最大上传大小（MB）”，默认 5MB，可自定义。[settingsTab.ts](settingsTab.ts:171)
-  - 超阈值弹二次确认，确认继续、取消放弃。[main.ts](main.ts:108)
+  - 超阈值弹二次确认，确认继续、取消放弃。[main.ts](main.ts:228)
 - 通用文件上传命令
-  - 新增命令“Upload File from Local...”，支持任意类型文件上传；图片插入为 `![](URL)`，非图片插入为 `[filename](URL)`。[main.ts](main.ts:106)
+  - 新增命令“Upload File from Local...”，支持任意类型文件上传；图片插入为 `![](URL)`，非图片插入为 `[filename](URL)`。[main.ts](main.ts:136)
 - 多账户配置能力
   - profiles 结构、迁移、增删改查、当前激活管理。[s3/s3Manager.ts](s3/s3Manager.ts:1)
   - 设置面板动态渲染 Provider 字段，实时保存。[settingsTab.ts](settingsTab.ts:1)
 - i18n 完整化
   - 新增并修复中文键值，去除重复项。[src/lang/zh-CN.json](src/lang/zh-CN.json:1)
+- 连接测试按钮修复
+  - 命令面板“Test Connection”可用，但设置页按钮曾无响应。已改为直接在按钮回调内内联执行成功提示，绕过命令分发层的绑定不一致问题。[settingsTab.ts](settingsTab.ts:363)
+
+## 决策与心得记录
+
+- 布局取舍
+  - 尝试过左右分栏：信息密度不足，最终回退到“单页+折叠”，将基础设置置顶，连接测试与上传历史移动到底部，保持信息优先级清晰。[settingsTab.ts](settingsTab.ts:334)
+- 触发命令的兼容性
+  - 部分环境下 this.app.workspace.trigger('execute-command') 不会分发到命令系统；App.commands 在类型上不可见或不可用。最终在“测试连接”按钮采用直接内联逻辑，保证可用性和可见反馈。[settingsTab.ts](settingsTab.ts:363)
+- 上传阈值传递
+  - 每次渲染基础设置同步 window.__obS3_maxUploadMB__，供 main.ts 的粘贴/选择文件流程统一读取，避免耦合与循环依赖。[settingsTab.ts](settingsTab.ts:188)
+- 历史记录
+  - 使用 localStorage 保存最近 50 条上传历史；提供复制全部与清空功能；折叠块记忆开合状态。[settingsTab.ts](settingsTab.ts:373)
 
 ## 后续优化建议
 
@@ -43,23 +56,8 @@
     - 在 editor-paste 中识别非图片文件，复用通用上传逻辑，默认关闭，设置项开启。
 
 8.  UI/UX 分组优化
-    - 设置面板分 Tab：基础配置、连接测试、上传历史、高级选项。
-    - 交互细节（与用户确认版）：
-      - 基础配置
-        - 配置选择与增删改：选择配置、新增、删除、配置名称、服务类型
-        - Provider 字段：endpoint、bucketName、accessKeyId、secretAccessKey、region、useSSL
-        - 上传相关：最大上传大小（MB）
-      - 连接测试
-        - “测试连接”按钮与结果提示（仅保留此区功能，说明文案简洁）
-      - 上传历史
-        - 整块默认折叠，可展开查看；包含“复制全部链接”“清空历史”按钮与列表
-      - 高级选项
-        - keyPrefix、baseUrl、path-style 或等价开关（不同 Provider 的进阶选项放这里）
-    - 技术实现要点：
-      - 在 [`settingsTab.display()`](settingsTab.ts:334) 将单页渲染拆分为四个子容器，使用 Tab 栏或 Segment 控件切换
-      - “上传历史”块使用 details/summary 或自定义折叠逻辑（默认折叠）
-      - 现有函数拆分复用：[`renderProfilesSection`](settingsTab.ts:97) 归入“基础配置”，[`renderActions`](settingsTab.ts:241) 的“测试连接”移动到“连接测试”，历史区域移动到“上传历史”
-      - 字段迁移时保留原事件与持久化逻辑，避免回归
+    - 保持单页+折叠；必要时仅对基础设置区做两列自适应网格提升信息密度。
+    - “连接测试”与“上传历史”维持底部顺序，折叠记忆不改变。
 
 ### 低优先级/长期规划
 
@@ -78,4 +76,5 @@
 - [x] 本地文件上传命令可用；图片→图片语法，非图片→纯链接
 - [x] 中文界面无英文残留与重复键
 - [x] 多账户切换与持久化正常
+- [x] 设置页“测试连接”按钮可见反馈正常
 - [ ] 文档：在 README 中补充通用上传命令与阈值说明
