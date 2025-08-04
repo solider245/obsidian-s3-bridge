@@ -128,6 +128,38 @@ export class MyPluginSettingTab extends PluginSettingTab {
         : tp('Missing: {keys}', { keys: status.miss.join(', ') })
       );
     stateBar.setClass?.('ob-s3-config-status');
+    // 一键静态校验按钮（不发网络）
+    stateBar.addButton(btn => {
+      btn.setButtonText(t('Validate Now')).onClick(() => {
+        try {
+          const a = loadActiveProfile(this.plugin);
+          const miss: string[] = [];
+          const must: Array<keyof S3Profile> = ['bucketName', 'accessKeyId', 'secretAccessKey'];
+          if (a?.providerType === 'aws-s3') must.push('region');
+          for (const k of must) if (!((a as any)?.[k])) miss.push(String(k));
+          const urlWarn: string[] = [];
+          // baseUrl 简单校验（可空；若存在则要求 http/https 且合法 URL）
+          if (a?.baseUrl) {
+            try {
+              const u = new URL(a.baseUrl);
+              if (!/^https?:$/i.test(u.protocol)) urlWarn.push('protocol not http/https');
+            } catch {
+              urlWarn.push('invalid baseUrl URL');
+            }
+          }
+          if (miss.length === 0 && urlWarn.length === 0) {
+            new Notice(t('Validation OK'));
+          } else {
+            const parts: string[] = [];
+            if (miss.length) parts.push(`Missing: ${miss.join(', ')}`);
+            if (urlWarn.length) parts.push(`BaseURL: ${urlWarn.join('; ')}`);
+            new Notice(parts.join(' | '));
+          }
+        } catch (e:any) {
+          new Notice(tp('Validation error: {error}', { error: e?.message ?? String(e) }));
+        }
+      });
+    });
 
     // 顶部：当前 Profile 选择与基础操作
     const header = new Setting(containerEl)
@@ -653,55 +685,112 @@ export class MyPluginSettingTab extends PluginSettingTab {
         new Notice(t('Upload history cleared'));
       };
 
+      // 过滤与排序工具条
+      const tools = historyContainer.createDiv({ cls: 'ob-s3-history-tools' });
+      const statusSel = tools.createEl('select');
+      ['all','success','failed','queued'].forEach(s => {
+        const opt = tools.ownerDocument!.createElement('option');
+        opt.value = s; opt.text = s;
+        statusSel.appendChild(opt);
+      });
+      const sortSel = tools.createEl('select');
+      [
+        { v:'size-desc', l:'Size ↓' },
+        { v:'size-asc',  l:'Size ↑' },
+        { v:'time-desc', l:'Time ↓' },
+        { v:'time-asc',  l:'Time ↑' }
+      ].forEach(o => {
+        const opt = tools.ownerDocument!.createElement('option');
+        opt.value = o.v; opt.text = o.l;
+        sortSel.appendChild(opt);
+      });
+
       const list = historyContainer.createEl('div', { cls: 'ob-s3-history-list' });
 
-      history.slice(0, 50).forEach((item: any, idx: number) => {
-        const row = list.createEl('div', { cls: 'ob-s3-history-row' });
-
-        const meta = row.createEl('div', { cls: 'ob-s3-history-meta' });
-        const time = new Date(item.time ?? Date.now()).toLocaleString();
-        const humanSize = (() => {
-          const b = Number(item.size || 0);
-          const kb = b / 1024, mb = kb / 1024;
-          if (mb >= 1) return `${mb.toFixed(2)} MB`;
-          if (kb >= 1) return `${kb.toFixed(1)} KB`;
-          return `${b} B`;
-        })();
-        meta.createEl('div', { text: item.fileName ?? t('(unknown file)') });
-        meta.createEl('div', { text: item.key ? `Key: ${item.key}` : t('Key: -') });
-        meta.createEl('div', { text: `${t('Time')}: ${time}` });
-        meta.createEl('div', { text: `${t('Size')}: ${humanSize}` });
-        meta.createEl('div', { text: `${t('Status')}: ${item.status || '-'}` });
-
-        if (item.error) {
-          const err = row.createEl('div', { cls: 'ob-s3-history-error' });
-          err.createEl('span', { text: `${t('Error')}: ${item.error}` });
+      const applyFilterSortAndRender = () => {
+        list.empty();
+        let arr = [...history];
+        // filter
+        const f = (statusSel.value || 'all');
+        if (f !== 'all') {
+          arr = arr.filter((x:any) => (x.status || 'queued') === f);
         }
+        // sort
+        const s = (sortSel.value || 'time-desc');
+        arr.sort((a:any,b:any) => {
+          const as = Number(a.size||0), bs = Number(b.size||0);
+          const at = Number(a.time||0), bt = Number(b.time||0);
+          switch (s) {
+            case 'size-desc': return bs - as;
+            case 'size-asc': return as - bs;
+            case 'time-asc': return at - bt;
+            case 'time-desc':
+            default: return bt - at;
+          }
+        });
+        arr.slice(0, 50).forEach((item:any, idx:number) => {
+          const row = list.createEl('div', { cls: 'ob-s3-history-row' });
 
-        const linkWrap = row.createEl('div', { cls: 'ob-s3-history-link' });
-        if (item.url) {
-          const a = linkWrap.createEl('a', { text: item.url, href: item.url });
-          a.target = '_blank';
-          const btnCopy = linkWrap.createEl('button', { text: t('Copy') });
-          btnCopy.onclick = async () => {
-            await navigator.clipboard.writeText(item.url);
-            new Notice(t('Link copied'));
+          const meta = row.createEl('div', { cls: 'ob-s3-history-meta' });
+          const time = new Date(item.time ?? Date.now()).toLocaleString();
+          const humanSize = (() => {
+            const b = Number(item.size || 0);
+            const kb = b / 1024, mb = kb / 1024;
+            if (mb >= 1) return `${mb.toFixed(2)} MB`;
+            if (kb >= 1) return `${kb.toFixed(1)} KB`;
+            return `${b} B`;
+          })();
+          meta.createEl('div', { text: item.fileName ?? t('(unknown file)') });
+          meta.createEl('div', { text: item.key ? `Key: ${item.key}` : t('Key: -') });
+          meta.createEl('div', { text: `${t('Time')}: ${time}` });
+          meta.createEl('div', { text: `${t('Size')}: ${humanSize}` });
+          meta.createEl('div', { text: `${t('Status')}: ${item.status || '-'}` });
+
+          const linkWrap = row.createEl('div', { cls: 'ob-s3-history-link' });
+          if (item.url) {
+            const a = linkWrap.createEl('a', { text: item.url, href: item.url });
+            a.target = '_blank';
+            // Open
+            const btnOpen = linkWrap.createEl('button', { text: t('Open') });
+            btnOpen.onclick = () => { try { window.open(item.url, '_blank'); } catch {} };
+            // Copy URL
+            const btnCopy = linkWrap.createEl('button', { text: t('Copy') });
+            btnCopy.onclick = async () => {
+              await navigator.clipboard.writeText(item.url);
+              new Notice(t('Link copied'));
+            };
+          }
+          // Copy Key
+          if (item.key) {
+            const btnCopyKey = linkWrap.createEl('button', { text: t('Copy Key') });
+            btnCopyKey.onclick = async () => {
+              try { await navigator.clipboard.writeText(String(item.key)); new Notice(t('Key copied')); } catch { new Notice(t('Copy failed')); }
+            };
+          }
+          // Remove record
+          const btnRemove = linkWrap.createEl('button', { text: t('Remove Record') });
+          btnRemove.onclick = () => {
+            try {
+              const k = 'obS3Uploader.history';
+              const raw = localStorage.getItem(k) ?? '[]';
+              const whole = Array.isArray(JSON.parse(raw)) ? JSON.parse(raw) : [];
+              // 在 whole 中定位该项（按 id+time 以提升稳定性）
+              const pos = whole.findIndex((x:any) => x && x.id === item.id && x.time === item.time);
+              const filtered = pos >= 0 ? whole.filter((_x:any,i:number) => i !== pos) : whole;
+              localStorage.setItem(k, JSON.stringify(filtered));
+              // 同步内存数组
+              const memIdx = history.findIndex((x:any) => x && x.id === item.id && x.time === item.time);
+              if (memIdx >= 0) history.splice(memIdx,1);
+              applyFilterSortAndRender();
+            } catch {}
           };
-        }
+        });
+      };
 
-        // 移除记录（仅本地历史，不影响 S3）
-        const btnRemove = linkWrap.createEl('button', { text: t('Remove Record') });
-        btnRemove.onclick = () => {
-          try {
-            const key = 'obS3Uploader.history';
-            const raw = localStorage.getItem(key) ?? '[]';
-            const arr = Array.isArray(JSON.parse(raw)) ? JSON.parse(raw) : [];
-            const filtered = arr.filter((x: any, i: number) => i !== idx);
-            localStorage.setItem(key, JSON.stringify(filtered));
-            renderHistory();
-          } catch {}
-        };
-      });
+      statusSel.onchange = applyFilterSortAndRender;
+      sortSel.onchange = applyFilterSortAndRender;
+
+      applyFilterSortAndRender();
     };
     renderHistory();
 
