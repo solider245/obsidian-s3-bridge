@@ -405,8 +405,20 @@ export default class ObS3GeminiPlugin extends Plugin {
 
               // 确保目录存在
               const vault = this.app.vault;
-              // createFolder 如果存在会抛错，捕获忽略
-              try { await vault.createFolder(safeDir); } catch {}
+              // 确保目录存在（野蛮模式）：使用 adapter.mkdir 递归创建
+              // @ts-ignore
+              if (vault.adapter && typeof vault.adapter.mkdir === 'function') {
+                try {
+                  // @ts-ignore
+                  await vault.adapter.mkdir(safeDir);
+                } catch (e) {
+                  // 如果 mkdir 失败，再尝试一次 createFolder 作为兜底
+                  try { await vault.createFolder(safeDir); } catch {}
+                }
+              } else {
+                // 回退到旧的、非递归的创建方式
+                try { await vault.createFolder(safeDir); } catch {}
+              }
 
               const fullPath = `${safeDir}/${fileName}`;
               // 将文件写入 Vault 并建立索引：优先使用 createBinary/modifyBinary；回退 create/modify

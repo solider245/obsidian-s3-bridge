@@ -41,8 +41,14 @@ function log(level: LogLevel, msg: string, data?: any) {
 
 const PLACEHOLDER_NAMESPACE = 'ob-s3';
 
-const RE_UPLOADING = /!\[[^\]]*?\bob-s3:id=([A-Za-z0-9]{16})\s+status=uploading[^\]]*?\]\((blob:[^)]+)\)/;
-const RE_FAILED = /!\[[^\]]*?\bob-s3:id=([A-Za-z0-9]{16})\s+status=failed[^\]]*?\]\((?:#|https?:\/\/[^\)]+|blob:[^\)]+)?\)\s*\[([^\]]*?)\]\(#\)/;
+const RE_UPLOADING = new RegExp(
+  String.raw`!\[[^\]]*?\b${PLACEHOLDER_NAMESPACE}:id=([A-Za-z0-9]{16})\s+status=uploading[^\]]*?\]\((blob:[^)]+|https?:\/\/[^)]+|[^)]+)\)`,
+  'm'
+);
+const RE_FAILED = new RegExp(
+  String.raw`!\[[^\]]*?\b${PLACEHOLDER_NAMESPACE}:id=([A-Za-z0-9]{16})\s+status=failed[^\]]*?\]\((?:#|https?:\/\/[^\)]+|blob:[^\)]+|[^)]+)?\)\s*\[([^\]]*?)\]\(#\)`,
+  'm'
+);
 
 /**
  * 生成 16 位字母数字 ID：UUID v4 去连字符取前16
@@ -129,6 +135,20 @@ export function findAndReplaceByUploadId(
     }
   }
   return changed;
+}
+
+/**
+ * 纯文本替换：在给定 Markdown 文本中查找包含指定 uploadId 的占位并替换为 replacement。
+ * 仅替换首个命中的占位（与编辑器版本的逐行首命中行为对齐）。
+ */
+export function replaceByUploadIdInText(text: string, uploadId: string, replacement: string): string {
+	if (!text || !uploadId) return text ?? '';
+
+	const regex = new RegExp(
+		String.raw`!\[[^\]]*?\b${PLACEHOLDER_NAMESPACE}:id=(${uploadId})\s+status=(uploading|failed)[^\]]*?\]\([^)]*\)(?:\s*\[[^\]]*?\]\(#\))?`
+	);
+
+	return text.replace(regex, replacement);
 }
 
 /**
