@@ -1,13 +1,20 @@
-import { App, Notice, PluginSettingTab, Setting } from 'obsidian';
+import { App, Notice, PluginSettingTab, Setting, TFolder, TFile } from 'obsidian';
 import MyPlugin from './main';
 import { t, tp } from './src/l10n';
 import { loadS3Config, saveS3Config, listProfiles, setCurrentProfile, upsertProfile, removeProfile, S3Profile, ProviderType, loadActiveProfile } from './s3/s3Manager';
 
 export interface MyPluginSettings {
   // 预留插件自有设置位
+  enableTempLocal?: boolean;   // 是否启用本地临时附件模式
+  tempPrefix?: string;         // 临时文件前缀，默认 temp_upload_
+  tempDir?: string;            // 临时目录，默认 .assets（Vault 相对路径）
 }
 
-export const DEFAULT_SETTINGS: MyPluginSettings = {};
+export const DEFAULT_SETTINGS: MyPluginSettings = {
+  enableTempLocal: false,
+  tempPrefix: 'temp_upload_',
+  tempDir: '.assets',
+};
 
 // Manifest 表单字段定义
 type FieldType = 'text' | 'password' | 'toggle';
@@ -255,6 +262,28 @@ export class MyPluginSettingTab extends PluginSettingTab {
       });
     });
 
+    // 新增：对象键日期格式设置（供 main.ts 读取并用于 makeObjectKey）
+    const keyFmtSetting = new Setting(containerEl)
+      .setName(t('Object Key Prefix Format'))
+      .setDesc(t('Use placeholders {yyyy}/{mm}/{dd}. Example: {yyyy}/{mm}. Leave empty to disable date folders.'));
+    keyFmtSetting.addText(tx => {
+      // 读取本地保存的格式，默认 {yyyy}/{mm}
+      let current = '{yyyy}/{mm}';
+      try {
+        const raw = localStorage.getItem('obS3Uploader.keyPrefixFormat');
+        if (raw) current = JSON.parse(raw) || current;
+      } catch { /* ignore */ }
+      tx.setPlaceholder('{yyyy}/{mm}')
+        .setValue(current)
+        .onChange(v => {
+          try {
+            localStorage.setItem('obS3Uploader.keyPrefixFormat', JSON.stringify((v ?? '').trim()));
+            // 将格式导出到 window，供运行期即时生效
+            (window as any).__obS3_keyPrefixFormat__ = (v ?? '').trim();
+          } catch { /* ignore */ }
+        });
+    });
+
     actions.addButton(btn => {
       btn.setButtonText(t('Test Connection')).onClick(async (evt) => {
         const plugin = this.plugin;
@@ -345,6 +374,137 @@ export class MyPluginSettingTab extends PluginSettingTab {
         : 5;
     } catch { /* noop */ }
     this.renderProfileForm(containerEl);
+
+    // 新增：临时附件模式设置与清理
+    containerEl.createEl('h2', { text: t('Temporary Attachments') });
+
+    // 读/写设置使用 localStorage（与 profiles 脱钩），避免破坏已有配置结构
+    const SETTINGS_KEY = 'obS3Uploader.tempSettings';
+    const readTempSettings = (): MyPluginSettings => {
+      try {
+        const raw = localStorage.getItem(SETTINGS_KEY);
+        if (!raw) return { ...DEFAULT_SETTINGS };
+        const obj = JSON.parse(raw);
+        return {
+          enableTempLocal: !!obj.enableTempLocal,
+          tempPrefix: obj.tempPrefix || DEFAULT_SETTINGS.tempPrefix,
+          tempDir: obj.tempDir || DEFAULT_SETTINGS.tempDir,
+        };
+      } catch {
+        return { ...DEFAULT_SETTINGS };
+      }
+    };
+    const writeTempSettings = (s: MyPluginSettings) => {
+      try {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+          enableTempLocal: !!s.enableTempLocal,
+          tempPrefix: s.tempPrefix || DEFAULT_SETTINGS.tempPrefix,
+          tempDir: s.tempDir || DEFAULT_SETTINGS.tempDir,
+        }));
+      } catch { /* ignore */ }
+    };
+
+    const tempSettings = readTempSettings();
+
+    // 开关：启用临时附件模式
+    new Setting(containerEl)
+      .setName(t('Enable temporary attachment mode'))
+      .setDesc(t('Store pasted files as local temp attachments first, then upload in background'))
+      .addToggle(tg => {
+        tg.setValue(!!tempSettings.enableTempLocal);
+        tg.onChange(v => {
+          tempSettings.enableTempLocal = v;
+          writeTempSettings(tempSettings);
+        });
+      });
+
+    // 文本：临时前缀
+    new Setting(containerEl)
+      .setName(t('Temporary file prefix'))
+      .setDesc(tp('Default: {prefix}', { prefix: DEFAULT_SETTINGS.tempPrefix! }))
+      .addText(tx => {
+        tx.setPlaceholder(DEFAULT_SETTINGS.tempPrefix!);
+        tx.setValue(tempSettings.tempPrefix || DEFAULT_SETTINGS.tempPrefix!);
+        tx.onChange(v => {
+          tempSettings.tempPrefix = (v || DEFAULT_SETTINGS.tempPrefix!) as string;
+          writeTempSettings(tempSettings);
+        });
+      });
+
+    // 文本：临时目录
+    new Setting(containerEl)
+      .setName(t('Temporary directory'))
+      .setDesc(tp('Default: {dir}', { dir: DEFAULT_SETTINGS.tempDir! }))
+      .addText(tx => {
+        tx.setPlaceholder(DEFAULT_SETTINGS.tempDir!);
+        tx.setValue(tempSettings.tempDir || DEFAULT_SETTINGS.tempDir!);
+        tx.onChange(v => {
+          tempSettings.tempDir = (v || DEFAULT_SETTINGS.tempDir!) as string;
+          writeTempSettings(tempSettings);
+        });
+      });
+
+    // 按钮：清理上传缓存（仅删除临时目录下以前缀开头的文件）带二次确认与数量提示
+    new Setting(containerEl)
+      .setName(t('Clean temporary uploads'))
+      .setDesc(t('Scan the temporary directory and delete files starting with the configured prefix'))
+      .addButton(btn => {
+        btn.setButtonText(t('Scan and clean')).onClick(async () => {
+          const { vault } = this.app;
+          const prefix = (readTempSettings().tempPrefix || DEFAULT_SETTINGS.tempPrefix!) as string;
+          const dir = (readTempSettings().tempDir || DEFAULT_SETTINGS.tempDir!) as string;
+
+          try {
+            // 列出目录
+            const targetPath = dir.replace(/^\/+/, '');
+            const folderAbstract = vault.getAbstractFileByPath(targetPath);
+            if (!folderAbstract || !(folderAbstract instanceof TFolder)) {
+              new Notice(tp('Temporary directory not found: {dir}', { dir: targetPath }));
+              return;
+            }
+
+            // 遍历目录内文件（仅一层/递归都可；此处做递归）
+            const collectFiles = (folder: TFolder): TFile[] => {
+              const out: TFile[] = [];
+              folder.children.forEach(ch => {
+                if (ch instanceof TFile) out.push(ch);
+                else if (ch instanceof TFolder) out.push(...collectFiles(ch));
+              });
+              return out;
+            };
+
+            const files = collectFiles(folderAbstract)
+              .filter(f => f.name.startsWith(prefix));
+
+            const count = files.length;
+            if (count <= 0) {
+              new Notice(t('No temporary files to clean'));
+              return;
+            }
+
+            const confirmed = window.confirm(
+              tp('Are you sure you want to delete {count} files? This action cannot be undone.', { count })
+            );
+            if (!confirmed) {
+              new Notice(t('Operation canceled'));
+              return;
+            }
+
+            let ok = 0, fail = 0;
+            for (const f of files) {
+              try {
+                await vault.delete(f, true);
+                ok++;
+              } catch {
+                fail++;
+              }
+            }
+            new Notice(tp('Cleanup complete. Deleted: {ok}, Failed: {fail}', { ok, fail }));
+          } catch (e: any) {
+            new Notice(tp('Cleanup failed: {error}', { error: e?.message ?? String(e) }));
+          }
+        });
+      });
 
     // 连接测试（折叠，可选默认展开：这里选择默认展开，便于快速测试）
     const testDetails = containerEl.createEl('details', { cls: 'ob-s3-fold ob-s3-fold-test' });

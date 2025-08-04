@@ -50,15 +50,46 @@ function getFileExtensionFromMime(mime: string): string {
   return 'bin';
 }
 
-function makeObjectKey(originalName: string | null, ext: string, prefix: string): string {
-  const safePrefix = (prefix || '').replace(/^\/+|\/+$/g, '');
-  const ts = Date.now();
-  const rand = Math.random().toString(36).slice(2);
-  const base = originalName
-    ? originalName.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/\s+/g, '_')
-    : `${ts}_${rand}.${ext}`;
-  const withExt = base.endsWith(`.${ext}`) ? base : `${base}.${ext}`;
-  return (safePrefix ? `${safePrefix}/` : '') + withExt;
+/**
+ * 生成对象键：
+ * - 新策略：优先使用“可配置的日期格式前缀 + uploadId.扩展名”
+ * - 回退策略：如没有传入 uploadId，则回退到旧逻辑（原始名清洗或时间戳_随机）
+ */
+function makeObjectKey(originalName: string | null, ext: string, prefix: string, uploadId?: string, dateFormat?: string): string {
+  const safePrefixFromConfig = (prefix || '').replace(/^\/+|\/+$/g, '');
+
+  // 计算日期格式前缀（例如 "{yyyy}/{mm}" -> "2025/08"）
+  const fmt = (dateFormat || '').trim();
+  let datePart = '';
+  if (fmt) {
+    const now = new Date();
+    const yyyy = String(now.getFullYear());
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    datePart = fmt.replace(/\{yyyy\}/g, yyyy).replace(/\{mm\}/g, mm).replace(/\{dd\}/g, dd);
+    // 去掉多余斜杠与前后空格
+    datePart = datePart.replace(/^\/+|\/+$/g, '').trim();
+  }
+
+  const pieces: string[] = [];
+  if (safePrefixFromConfig) pieces.push(safePrefixFromConfig);
+  if (datePart) pieces.push(datePart);
+
+  // 文件名：若有 uploadId，则严格使用 uploadId.ext 确保唯一；否则回退到旧策略
+  let fileName: string;
+  if (uploadId) {
+    fileName = `${uploadId}.${ext}`;
+  } else {
+    const ts = Date.now();
+    const rand = Math.random().toString(36).slice(2);
+    const base = originalName
+      ? originalName.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/\s+/g, '_')
+      : `${ts}_${rand}.${ext}`;
+    fileName = base.endsWith(`.${ext}`) ? base : `${base}.${ext}`;
+  }
+
+  pieces.push(fileName);
+  return pieces.join('/');
 }
 
 async function readClipboardImageAsBase64(): Promise<{ base64: string; mime: string; size?: number } | null> {
@@ -120,6 +151,18 @@ export default class ObS3GeminiPlugin extends Plugin {
     const cfg = await loadS3Config(this);
     const keyPrefix = (cfg.keyPrefix || '').replace(/^\/+|\/+$/g, '');
 
+    // 读取“临时附件模式”设置（从 localStorage 以避免打断 profiles 结构）
+    const TEMP_SETTINGS_KEY = 'obS3Uploader.tempSettings';
+    const tempSettings = (() => {
+      try {
+        const raw = localStorage.getItem(TEMP_SETTINGS_KEY);
+        return raw ? JSON.parse(raw) : {};
+      } catch { return {}; }
+    })();
+    const enableTempLocal = !!tempSettings.enableTempLocal;
+    const tempPrefix = (tempSettings.tempPrefix || 'temp_upload_') as string;
+    const tempDir = (tempSettings.tempDir || '.assets') as string;
+
     // 安装“失败重试”点击拦截（乐观UI + 内存缓存重试）
     const retryHandler = optimistic.handleRetryClickInEditor(this, async ({ editor, uploadId }) => {
       try {
@@ -136,9 +179,9 @@ export default class ObS3GeminiPlugin extends Plugin {
           return tempUploading;
         });
 
-        // 生成 key 并发起上传
+        // 生成 key 并发起上传（使用 uploadId 以防覆盖；支持日期格式前缀）
         const ext = getFileExtensionFromMime(payload.mime || 'application/octet-stream');
-        const key = makeObjectKey(payload.fileName || null, ext, keyPrefix);
+        const key = makeObjectKey(payload.fileName || null, ext, keyPrefix, uploadId, (window as any).__obS3_keyPrefixFormat__);
 
         const publicUrl = await presignAndPutObject(this, {
           key,
@@ -217,7 +260,8 @@ export default class ObS3GeminiPlugin extends Plugin {
           const ext = getFileExtensionFromMime(mime);
           const cfgNow = await loadS3Config(this);
           const keyPrefix = (cfgNow.keyPrefix || '').replace(/^\/+|\/+$/g, '');
-          const key = makeObjectKey(choice.name || null, ext, keyPrefix);
+          const uploadId = optimistic.generateUploadId();
+          const key = makeObjectKey(choice.name || null, ext, keyPrefix, uploadId, (window as any).__obS3_keyPrefixFormat__);
 
           const publicUrl = await presignAndPutObject(this, {
             key,
@@ -278,7 +322,8 @@ export default class ObS3GeminiPlugin extends Plugin {
           }
 
           const ext = getFileExtensionFromMime(clip.mime);
-          const key = makeObjectKey(null, ext, keyPrefix);
+          const uploadId = optimistic.generateUploadId();
+          const key = makeObjectKey(null, ext, keyPrefix, uploadId, (window as any).__obS3_keyPrefixFormat__);
           const publicUrl = await presignAndPutObject(this, {
             key,
             contentType: clip.mime || 'application/octet-stream',
@@ -298,7 +343,7 @@ export default class ObS3GeminiPlugin extends Plugin {
       },
     });
 
-    // 监听编辑器粘贴事件（乐观UI版）：若有图片则先插入本地 blob 预览占位，再后台上传并替换
+    // 监听编辑器粘贴事件（乐观UI版）：若有图片则先插入本地占位（blob 或临时文件），再后台上传并替换
     this.registerEvent(
       this.app.workspace.on('editor-paste', async (evt, editor: Editor) => {
         try {
@@ -332,23 +377,109 @@ export default class ObS3GeminiPlugin extends Plugin {
           // 阻止默认粘贴图片为附件的行为
           evt.preventDefault();
 
-          // 1) 立即插入本地预览占位
-          const blobUrl = URL.createObjectURL(file);
-          const uploadId = optimistic.generateUploadId();
-          const placeholderMd = optimistic.buildUploadingMarkdown(uploadId, blobUrl);
-          editor.replaceSelection(placeholderMd);
-
-          // 2) 读取文件到 base64，并写入内存缓存，供“重试”复用
+          // 读取文件到 base64
           const arrayBuffer = await file.arrayBuffer();
           const base64 = Buffer.from(arrayBuffer).toString('base64');
           const mime = file.type || 'application/octet-stream';
-          optimistic.cacheUploadPayload(uploadId, { base64, mime, fileName: file.name || undefined });
+
+          // 1) 构造占位：blob 或 临时文件
+          const uploadId = optimistic.generateUploadId();
+          let previewUrl: string;
+
+          if (!enableTempLocal) {
+            // 内存 blob 模式
+            const blobUrl = URL.createObjectURL(file);
+            previewUrl = blobUrl;
+          } else {
+            // 临时附件模式：将图片写入 vault 下的临时目录，并使用本地相对路径作为占位
+            try {
+              const ext = getFileExtensionFromMime(mime);
+              const ts = Date.now();
+              const rand = Math.random().toString(36).slice(2);
+              const safeDir = (tempDir as string).replace(/^\/+/, '');
+              const fileName = `${tempPrefix}${ts}_${rand}.${ext}`;
+
+              // 确保目录存在
+              const vault = this.app.vault;
+              // createFolder 如果存在会抛错，捕获忽略
+              try { await vault.createFolder(safeDir); } catch {}
+
+              const fullPath = `${safeDir}/${fileName}`;
+              // 将文件写入 Vault 并建立索引：优先使用 createBinary/modifyBinary；回退 create/modify
+              const bin = Buffer.from(base64, 'base64');
+              // @ts-ignore
+              const hasCreateBinary = typeof (vault as any).createBinary === 'function';
+              // @ts-ignore
+              const hasModifyBinary = typeof (vault as any).modifyBinary === 'function';
+
+              const existing = vault.getAbstractFileByPath(fullPath);
+              if (!existing) {
+                try {
+                  if (hasCreateBinary) {
+                    // @ts-ignore
+                    await (vault as any).createBinary(fullPath, bin);
+                  } else {
+                    await vault.create(fullPath, bin.toString('binary'));
+                  }
+                } catch (e) {
+                  // 若因已存在失败（竞态），尝试修改
+                  const again = vault.getAbstractFileByPath(fullPath);
+                  if (again && again instanceof (window as any).app.vault.constructor.prototype.constructor.TFile) {
+                    if (hasModifyBinary) {
+                      // @ts-ignore
+                      await (vault as any).modifyBinary(again, bin);
+                    } else {
+                      await vault.modify(again as any, bin.toString('binary'));
+                    }
+                  } else {
+                    // 最后兜底再尝试 create 普通文本
+                    await vault.create(fullPath, bin.toString('binary'));
+                  }
+                }
+              } else {
+                if (existing instanceof (window as any).app.vault.constructor.prototype.constructor.TFile) {
+                  if (hasModifyBinary) {
+                    // @ts-ignore
+                    await (vault as any).modifyBinary(existing, bin);
+                  } else {
+                    await vault.modify(existing as any, bin.toString('binary'));
+                  }
+                }
+              }
+
+              // 使用 vault 相对路径作为占位（不加 ./，避免相对当前笔记路径歧义）
+              previewUrl = fullPath;
+
+              // 将本地路径也塞进缓存，便于成功后删除
+              optimistic.cacheUploadPayload(uploadId, { base64, mime, fileName: file.name || undefined });
+              // 追加一个轻量标记供后续删除（通过 window 侧 map 记录）
+              try {
+                const mark = (window as any).__obS3_tempFiles__ as Map<string, string> | undefined;
+                if (!mark) (window as any).__obS3_tempFiles__ = new Map<string, string>();
+                ((window as any).__obS3_tempFiles__ as Map<string, string>).set(uploadId, fullPath);
+              } catch {}
+            } catch (e: any) {
+              // 若本地写入失败，回退到 blob 模式
+              const blobUrl = URL.createObjectURL(file);
+              previewUrl = blobUrl;
+              new Notice(tp('Local temp file write failed, fallback to blob: {error}', { error: e?.message ?? String(e) }));
+            }
+          }
+
+          const placeholderMd = optimistic.buildUploadingMarkdown(uploadId, previewUrl);
+          editor.replaceSelection(placeholderMd);
+
+          // 2) 内存缓存用于“重试”（blob 或本地模式都需要）
+          if (!enableTempLocal) {
+            optimistic.cacheUploadPayload(uploadId, { base64, mime, fileName: file.name || undefined });
+          }
 
           // 3) 异步上传
           (async () => {
             try {
               const ext = getFileExtensionFromMime(mime);
-              const key = makeObjectKey(file.name || null, ext, keyPrefix);
+              // 使用 uploadId + 可选日期格式，确保唯一且便于归档
+              const key = makeObjectKey(file.name || null, ext, keyPrefix, uploadId, (window as any).__obS3_keyPrefixFormat__);
 
               const publicUrl = await presignAndPutObject(this, {
                 key,
@@ -356,15 +487,37 @@ export default class ObS3GeminiPlugin extends Plugin {
                 bodyBase64: base64,
               });
 
-              // 成功：替换为最终 URL，并释放 blob URL与缓存
+              // 成功：替换为最终 URL，并释放本地资源与缓存
               optimistic.findAndReplaceByUploadId(editor, uploadId, () => `![](${publicUrl})`);
               optimistic.removeUploadPayload(uploadId);
-              try { URL.revokeObjectURL(blobUrl); } catch {}
+              // 释放 blob
+              if (!enableTempLocal && previewUrl.startsWith('blob:')) {
+                try { URL.revokeObjectURL(previewUrl); } catch {}
+              }
+              // 删除临时文件
+              if (enableTempLocal) {
+                try {
+                  const localMap = (window as any).__obS3_tempFiles__ as Map<string, string> | undefined;
+                  const fullPath = localMap?.get(uploadId);
+                  if (fullPath) {
+                    const file = this.app.vault.getAbstractFileByPath(fullPath);
+                    if (file) {
+                      await this.app.vault.delete(file);
+                    } else {
+                      // 兜底：若未被索引，直接通过适配器删除
+                      await this.app.vault.adapter.remove(fullPath);
+                    }
+                    if (localMap) localMap.delete(uploadId);
+                  }
+                } catch {}
+              }
               new Notice(t('Upload successful!'));
             } catch (e:any) {
-              // 失败：替换为失败占位，并释放 blob URL（保留缓存以便一键重试）
+              // 失败：替换为失败占位；释放 blob；临时文件保留以便清理或复用
               optimistic.findAndReplaceByUploadId(editor, uploadId, () => optimistic.buildFailedMarkdown(uploadId));
-              try { URL.revokeObjectURL(blobUrl); } catch {}
+              if (!enableTempLocal && previewUrl.startsWith('blob:')) {
+                try { URL.revokeObjectURL(previewUrl); } catch {}
+              }
               new Notice(tp('Upload failed: {error}', { error: e?.message ?? String(e) }));
             }
           })();

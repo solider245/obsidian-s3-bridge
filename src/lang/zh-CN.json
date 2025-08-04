@@ -71,5 +71,25 @@
   "Advanced": "高级选项",
   "Upload History (click to expand)": "上传历史（点击展开）",
   "Only keep essential actions here": "此处仅保留必要操作",
-  "Provider advanced options will appear here.": "提供商的高级选项将显示在此处。"
+  "Provider advanced options will appear here.": "提供商的高级选项将显示在此处。",
+
+  "Temporary Attachments": "临时附件模式",
+  "Enable temporary attachment mode": "启用临时附件模式",
+  "Store pasted files as local temp attachments first, then upload in background": "粘贴文件先保存为本地临时附件，后台上传成功后替换链接",
+  "Temporary file prefix": "临时文件前缀",
+  "Temporary directory": "临时目录",
+  "Default: {prefix}": "默认：{prefix}",
+  "Default: {dir}": "默认：{dir}",
+  "Clean temporary uploads": "清理上传缓存",
+  "Scan the temporary directory and delete files starting with the configured prefix": "扫描临时目录并删除以配置前缀开头的文件",
+  "Scan and clean": "扫描并清理",
+  "Temporary directory not found: {dir}": "未找到临时目录：{dir}",
+  "No temporary files to clean": "没有可清理的临时文件",
+  "Are you sure you want to delete {count} files? This action cannot be undone.": "你确定要删除 {count} 个文件吗？该操作不可撤销。",
+  "Operation canceled": "操作已取消",
+  "Cleanup complete. Deleted: {ok}, Failed: {fail}": "清理完成。成功删除：{ok}，失败：{fail}",
+  "Cleanup failed: {error}": "清理失败：{error}",
+
+  "Uploading...": "上传中",
+  "Please paste again to retry upload": "请再次粘贴以重试上传"
 }
