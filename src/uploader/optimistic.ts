@@ -23,6 +23,22 @@ import type { Editor, Plugin } from 'obsidian';
 import { MarkdownView } from 'obsidian';
 import { presignAndPutObject } from './presignPut';
 
+// 轻量日志：使用全局 ring buffer，避免引入新依赖
+type LogLevel = 'error' | 'warn' | 'info' | 'debug';
+interface LogEntry { t: number; level: LogLevel; msg: string; data?: any; }
+const __LOG__: LogEntry[] = (window as any).__obS3_logs__ ?? ((window as any).__obS3_logs__ = []);
+function log(level: LogLevel, msg: string, data?: any) {
+  try {
+    const lvl = ((window as any).__obS3_logLevel__ ?? 'info') as LogLevel;
+    const rank: Record<LogLevel, number> = { error:0, warn:1, info:2, debug:3 };
+    if (rank[level] <= (rank[lvl] ?? 2)) {
+      __LOG__.push({ t: Date.now(), level, msg, data });
+      const cap = Math.max(100, Number((window as any).__obS3_logCap__ ?? 500));
+      if (__LOG__.length > cap) __LOG__.splice(0, __LOG__.length - cap);
+    }
+  } catch {}
+}
+
 const PLACEHOLDER_NAMESPACE = 'ob-s3';
 
 const RE_UPLOADING = /!\[[^\]]*?\bob-s3:id=([A-Za-z0-9]{16})\s+status=uploading[^\]]*?\]\((blob:[^)]+)\)/;
@@ -54,6 +70,7 @@ function fallbackUUIDv4(): string {
  */
 export function buildUploadingMarkdown(uploadId: string, blobUrl: string): string {
   const alt = `上传中 ${PLACEHOLDER_NAMESPACE}:id=${uploadId} status=uploading`;
+  log('debug', 'buildUploadingMarkdown', { uploadId, blobUrlLen: blobUrl?.length ?? 0 });
   return `![${alt}](${blobUrl})`;
 }
 
@@ -62,6 +79,7 @@ export function buildUploadingMarkdown(uploadId: string, blobUrl: string): strin
  */
 export function buildFailedMarkdown(uploadId: string): string {
   const alt = `上传失败 ${PLACEHOLDER_NAMESPACE}:id=${uploadId} status=failed`;
+  log('info', 'buildFailedMarkdown', { uploadId });
   // 链接部分占位为 #，随后追加 [重试](#)
   return `![${alt}](#) [重试](#)`;
 }
@@ -120,16 +138,19 @@ export function findAndReplaceByUploadId(
 const __uploadPayloadCache: Map<string, { base64: string; mime: string; fileName?: string }> = new Map();
 
 export function cacheUploadPayload(uploadId: string, payload: { base64: string; mime: string; fileName?: string }) {
+  log('debug', 'cacheUploadPayload', { uploadId, mime: payload?.mime, sizeB64: payload?.base64?.length ?? 0 });
   __uploadPayloadCache.set(uploadId, payload);
 }
 
 export function takeUploadPayload(uploadId: string): { base64: string; mime: string; fileName?: string } | undefined {
   const val = __uploadPayloadCache.get(uploadId);
+  log('debug', 'takeUploadPayload', { uploadId, hit: !!val });
   // 不在这里删除，调用方根据是否成功决定清理；也可选择 get 后保留
   return val;
 }
 
 export function removeUploadPayload(uploadId: string) {
+  log('debug', 'removeUploadPayload', { uploadId });
   __uploadPayloadCache.delete(uploadId);
 }
 
@@ -163,10 +184,11 @@ export function handleRetryClickInEditor(
 
           evt.preventDefault();
           evt.stopPropagation();
+          log('info', 'retry.click', { uploadId });
           onRetry({ editor, uploadId });
-        } catch { /* ignore */ }
+        } catch (e) { log('warn', 'retry.click.error', { err: (e as any)?.message }); }
       }, 0);
-    } catch { /* ignore */ }
+    } catch (e) { log('warn', 'retry.click.guard', { err: (e as any)?.message }); }
   };
 
   const leaf = plugin.app.workspace.activeLeaf as any;
@@ -194,10 +216,14 @@ export async function uploadBase64AndReturnUrl(
   mime: string,
   base64: string
 ): Promise<string> {
+  const presignTimeoutMs = Math.max(1000, Number((window as any).__obS3_presignTimeout__ ?? 10000));
+  const uploadTimeoutMs = Math.max(1000, Number((window as any).__obS3_uploadTimeout__ ?? 25000));
   const url = await presignAndPutObject(plugin, {
     key,
     contentType: mime || 'application/octet-stream',
     bodyBase64: base64,
+    presignTimeoutMs,
+    uploadTimeoutMs,
   });
   return url;
 }

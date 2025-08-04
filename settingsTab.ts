@@ -666,6 +666,104 @@ export class MyPluginSettingTab extends PluginSettingTab {
     };
     renderHistory();
 
+    // 日志分区：日志级别、复制、清空、容量
+    const logsDetails = containerEl.createEl('details', { cls: 'ob-s3-fold ob-s3-fold-logs' });
+    const logsFoldKey = 'obS3Uploader.fold.logs';
+    const logsSaved = localStorage.getItem(logsFoldKey);
+    logsDetails.open = logsSaved === 'open'; // 默认折叠
+    logsDetails.addEventListener('toggle', () => {
+      localStorage.setItem(logsFoldKey, logsDetails.open ? 'open' : 'closed');
+    });
+    logsDetails.createEl('summary', { text: t('Logs') });
+
+    const logsWrap = logsDetails.createDiv({ cls: 'ob-s3-logs-wrap' });
+
+    // 日志级别
+    const levelSetting = new Setting(logsWrap)
+      .setName(t('Log Level'))
+      .setDesc(t('Choose minimum level to record logs'));
+    levelSetting.addDropdown(dd => {
+      const KEY = 'obS3Uploader.logLevel';
+      const options: Record<string,string> = { error:'error', warn:'warn', info:'info', debug:'debug' };
+      Object.keys(options).forEach(k => dd.addOption(k, k));
+      let current = 'info';
+      try {
+        const raw = localStorage.getItem(KEY);
+        if (raw) current = JSON.parse(raw) || 'info';
+      } catch {}
+      dd.setValue(current);
+      dd.onChange(v => {
+        try {
+          localStorage.setItem(KEY, JSON.stringify(v));
+          (window as any).__obS3_logLevel__ = v;
+          new Notice(tp('Log level: {level}', { level: v }));
+        } catch {}
+      });
+    });
+
+    // 日志容量
+    const capSetting = new Setting(logsWrap)
+      .setName(t('Log Capacity'))
+      .setDesc(t('Max number of recent log entries to keep (default 500)'));
+    capSetting.addText(tx => {
+      const KEY = 'obS3Uploader.logCap';
+      let current = 500;
+      try {
+        const raw = localStorage.getItem(KEY);
+        if (raw) current = Math.max(100, Math.floor(Number(JSON.parse(raw)) || 500));
+      } catch {}
+      tx.setPlaceholder('500').setValue(String(current));
+      tx.onChange(v => {
+        const num = Math.max(100, Math.floor(Number(v) || 500));
+        try {
+          localStorage.setItem(KEY, JSON.stringify(num));
+          (window as any).__obS3_logCap__ = num;
+        } catch {}
+      });
+    });
+
+    // 复制与清空
+    const ops = new Setting(logsWrap)
+      .setName(t('Log Operations'))
+      .setDesc(t('Export or clear logs'));
+    ops.addButton(btn => {
+      btn.setButtonText(t('Copy Recent Logs')).onClick(async () => {
+        try {
+          const arr = ((window as any).__obS3_logs__ ?? []) as any[];
+          if (!arr.length) {
+            new Notice(t('No logs yet'));
+            return;
+          }
+          // 只导出最近 N 条（按容量）
+          const cap = Math.max(100, Number((window as any).__obS3_logCap__ ?? 500));
+          const recent = arr.slice(-cap);
+          const text = JSON.stringify(recent, null, 2);
+          await navigator.clipboard.writeText(text);
+          new Notice(t('Logs copied to clipboard'));
+        } catch (e:any) {
+          new Notice(tp('Copy failed: {error}', { error: e?.message ?? String(e) }));
+        }
+      });
+    });
+    ops.addButton(btn => {
+      btn.setButtonText(t('Clear Logs')).onClick(() => {
+        try {
+          const store = (window as any).__obS3_logs__;
+          if (Array.isArray(store)) store.length = 0;
+          new Notice(t('Logs cleared'));
+        } catch {}
+      });
+    });
+
+    // 将日志级别与容量导出到 window（首次渲染时）
+    try {
+      const lvl = (() => { try { return JSON.parse(localStorage.getItem('obS3Uploader.logLevel') || '"info"'); } catch { return 'info'; } })();
+      const cap = (() => { try { return Math.max(100, Math.floor(Number(JSON.parse(localStorage.getItem('obS3Uploader.logCap') || '500')))); } catch { return 500; } })();
+      (window as any).__obS3_logLevel__ = lvl;
+      (window as any).__obS3_logCap__ = cap;
+      (window as any).__obS3_logs__ = (window as any).__obS3_logs__ ?? [];
+    } catch {}
+
     // 高级选项（默认折叠，先放说明；后续可把更高级字段搬过来或仅作为说明）
     const advancedDetails = containerEl.createEl('details', { cls: 'ob-s3-fold ob-s3-fold-advanced' });
     const advFoldKey = 'obS3Uploader.fold.advanced';
