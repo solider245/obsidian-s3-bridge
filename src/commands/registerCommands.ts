@@ -20,6 +20,28 @@ export interface RegisterCtx {
   generateUploadId: () => string;
 }
 
+// 队列项结构，复用 saveData.uploadQueue
+type QueueItem = {
+  id: string;
+  filename: string;
+  mime: string;
+  path: string;
+  createdAt: number;
+  size?: number;
+  base64Length?: number;
+};
+
+async function loadQueue(plugin: Plugin): Promise<QueueItem[]> {
+  const existing = (await (plugin as any).loadData()) ?? {};
+  return Array.isArray(existing.uploadQueue) ? (existing.uploadQueue as QueueItem[]) : [];
+}
+
+async function saveQueue(plugin: Plugin, list: QueueItem[]): Promise<void> {
+  const existing = (await (plugin as any).loadData()) ?? {};
+  (existing as any).uploadQueue = list;
+  await (plugin as any).saveData(existing);
+}
+
 export function registerCommands(ctx: RegisterCtx) {
   const { plugin, makeObjectKey, getExt, ensureWithinLimitOrConfirm, readClipboardImageAsBase64, generateUploadId } = ctx;
 
@@ -88,6 +110,118 @@ export function registerCommands(ctx: RegisterCtx) {
           }
         }
       } catch (e: any) {
+        new Notice(tp('Upload failed: {error}', { error: e?.message ?? String(e) }));
+      }
+    },
+  });
+
+  // 队列状态调试
+  plugin.addCommand({
+    id: 'obs3gemini-queue-status',
+    name: 'Queue: Status',
+    callback: async () => {
+      try {
+        const list = await loadQueue(plugin);
+        const n = list.length;
+        const head = list.slice(0, 5).map((x: QueueItem) => `${x.id} ${x.filename}`).join('\n');
+        new Notice(n > 0 ? `Queue length: ${n}\n${head}` : 'Queue empty');
+      } catch (e: any) {
+        new Notice(tp('Operation failed: {error}', { error: e?.message ?? String(e) }));
+      }
+    },
+  });
+
+  // 处理下一条队列
+  plugin.addCommand({
+    id: 'obs3gemini-queue-process-next',
+    name: 'Queue: Process Next Item',
+    callback: async () => {
+      try {
+        const list = await loadQueue(plugin);
+        if (!list.length) {
+          new Notice('Queue empty');
+          return;
+        }
+        const item = list[0];
+
+        // 根据已有配置构建上传 key
+        const cfgNow = await loadS3Config(plugin);
+        const keyPrefix = (cfgNow.keyPrefix || '').replace(/^\/+|\/+$/g, '');
+        const ext = getExt(item.mime);
+        // 复用 uploadId 作为文件名，确保唯一
+        const key = makeObjectKey(item.filename || null, ext, keyPrefix, item.id, (window as any).__obS3_keyPrefixFormat__);
+
+        // 读取本地临时文件内容或回退
+        let base64: string | null = null;
+        // 0) 兜底：如果 path 形如 ".assets/xxx.png?12345"（极端情况下被追加了查询串），先剥离查询串
+        const sanitizedPath = (item.path || '').split('?')[0];
+        // 1) 优先从 optimistic 内存缓存拿
+        try {
+          const cached = (require('../uploader/optimistic') as any).takeUploadPayload(item.id);
+          base64 = cached?.base64 ?? null;
+        } catch { /* ignore */ }
+        // 2) 无缓存再尝试从本地临时文件读取（仅当 path 指向 vault 文件时）
+        if (!base64 && sanitizedPath) {
+          try {
+            const adapter: any = (plugin.app.vault as any)?.adapter;
+            if (adapter && typeof adapter.readBinary === 'function') {
+              const bin: ArrayBuffer = await adapter.readBinary(sanitizedPath);
+              base64 = Buffer.from(bin).toString('base64');
+            } else {
+              const txt = await plugin.app.vault.adapter.read(sanitizedPath);
+              base64 = Buffer.from(txt, 'binary').toString('base64');
+            }
+          } catch { /* ignore */ }
+        }
+        if (!base64) {
+          new Notice(tp('Upload failed: {error}', { error: 'Local temp missing and no cache' }));
+          return;
+        }
+
+        const url = await performUpload(plugin, {
+          key,
+          mime: item.mime || 'application/octet-stream',
+          base64,
+        });
+
+        // 替换占位为最终链接
+        const view = plugin.app.workspace.getActiveViewOfType(MarkdownView);
+        if (view) {
+          const editor: Editor = view.editor;
+          (require('../uploader/optimistic') as any).findAndReplaceByUploadId(editor, item.id, (full: string, _line: string) => {
+            // 若为图片占位，保持 ![] 形式；否则保底替换为超链接
+            if (/\!\[/.test(full)) return `![](${url})`;
+            return `[${item.filename || 'file'}](${url})`;
+          });
+          (require('../uploader/optimistic') as any).removeUploadPayload(item.id);
+        }
+
+        // 尝试删除临时文件
+        try {
+          if (item.path) {
+            const file = plugin.app.vault.getAbstractFileByPath(item.path);
+            if (file) {
+              await plugin.app.vault.delete(file);
+            } else {
+              await plugin.app.vault.adapter.remove(item.path);
+            }
+          }
+        } catch { /* ignore */ }
+
+        // 从队列移除
+        await saveQueue(plugin, list.slice(1));
+        new Notice('Queue processed 1 item');
+      } catch (e: any) {
+        // 失败：替换为失败占位，保留队列项
+        try {
+          const view = plugin.app.workspace.getActiveViewOfType(MarkdownView);
+          if (view) {
+            const editor: Editor = view.editor;
+            (require('../uploader/optimistic') as any).findAndReplaceByUploadId(editor, (e as any)?.id ?? '', () =>
+              (require('../uploader/optimistic') as any).buildFailedMarkdown((e as any)?.id ?? '')
+            );
+          }
+        } catch {}
         new Notice(tp('Upload failed: {error}', { error: e?.message ?? String(e) }));
       }
     },
