@@ -91,5 +91,10 @@
   "Cleanup failed: {error}": "清理失败：{error}",
 
   "Uploading...": "上传中",
-  "Please paste again to retry upload": "请再次粘贴以重试上传"
+  "Please paste again to retry upload": "请再次粘贴以重试上传",
+
+  "Presign Timeout (seconds)": "预签名超时（秒）",
+  "Default 10s. Fail fast when presign is stuck.": "默认 10 秒。预签名卡住时快速失败。",
+  "Upload Timeout (seconds)": "上传超时（秒）",
+  "Default 25s. Abort PUT when network stalls.": "默认 25 秒。网络阻塞时中止 PUT。"
 }

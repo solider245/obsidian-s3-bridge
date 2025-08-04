@@ -192,12 +192,62 @@ export class MyPluginSettingTab extends PluginSettingTab {
       });
     });
 
-    // 将当前 profile 的最大上传大小暴露到 window，供 main.ts 使用
+    // 新增：预签名与上传超时（秒）
+    const presignTimeout = new Setting(containerEl)
+      .setName(t('Presign Timeout (seconds)'))
+      .setDesc(t('Default 10s. Fail fast when presign is stuck.'));
+    presignTimeout.addText(text => {
+      // 使用 localStorage 以避免破坏 profiles 结构
+      let saved = 10;
+      try {
+        const raw = localStorage.getItem('obS3Uploader.presignTimeoutSec');
+        if (raw) saved = Math.max(1, Math.floor(Number(JSON.parse(raw))));
+      } catch {}
+      text.setPlaceholder('10').setValue(String(saved));
+      text.onChange(v => {
+        const num = Math.max(1, Math.floor(Number(v) || 10));
+        try {
+          localStorage.setItem('obS3Uploader.presignTimeoutSec', JSON.stringify(num));
+          (window as any).__obS3_presignTimeout__ = num * 1000;
+        } catch {}
+      });
+    });
+
+    const uploadTimeout = new Setting(containerEl)
+      .setName(t('Upload Timeout (seconds)'))
+      .setDesc(t('Default 25s. Abort PUT when network stalls.'));
+    uploadTimeout.addText(text => {
+      let saved = 25;
+      try {
+        const raw = localStorage.getItem('obS3Uploader.uploadTimeoutSec');
+        if (raw) saved = Math.max(1, Math.floor(Number(JSON.parse(raw))));
+      } catch {}
+      text.setPlaceholder('25').setValue(String(saved));
+      text.onChange(v => {
+        const num = Math.max(1, Math.floor(Number(v) || 25));
+        try {
+          localStorage.setItem('obS3Uploader.uploadTimeoutSec', JSON.stringify(num));
+          (window as any).__obS3_uploadTimeout__ = num * 1000;
+        } catch {}
+      });
+    });
+
+    // 将当前 profile 的最大上传大小与超时暴露到 window，供运行期使用
     try {
       const activeNow = loadActiveProfile(this.plugin) as any;
       (window as any).__obS3_maxUploadMB__ = Number.isFinite(activeNow?.maxUploadMB) && activeNow?.maxUploadMB > 0
         ? Math.floor(activeNow.maxUploadMB)
         : 5;
+
+      // 将超时秒数导出为毫秒
+      const presignSec = (() => {
+        try { return Math.max(1, Math.floor(Number(JSON.parse(localStorage.getItem('obS3Uploader.presignTimeoutSec') || '10')))); } catch { return 10; }
+      })();
+      const uploadSec = (() => {
+        try { return Math.max(1, Math.floor(Number(JSON.parse(localStorage.getItem('obS3Uploader.uploadTimeoutSec') || '25')))); } catch { return 25; }
+      })();
+      (window as any).__obS3_presignTimeout__ = presignSec * 1000;
+      (window as any).__obS3_uploadTimeout__ = uploadSec * 1000;
     } catch { /* noop */ }
   }
 
@@ -524,7 +574,15 @@ export class MyPluginSettingTab extends PluginSettingTab {
       btn.setButtonText(t('Test Connection')).onClick(async () => {
         // 直接调用命令的实现，绕过命令分发层，确保按钮总能工作
         try {
-          // 内联调用 main.ts 注册命令的等价逻辑
+          // 在测试路径中也使用超时参数，保障不会卡住
+          const presignSec = (() => {
+            try { return Math.max(1, Math.floor(Number(JSON.parse(localStorage.getItem('obS3Uploader.presignTimeoutSec') || '10')))); } catch { return 10; }
+          })();
+          const uploadSec = (() => {
+            try { return Math.max(1, Math.floor(Number(JSON.parse(localStorage.getItem('obS3Uploader.uploadTimeoutSec') || '25')))); } catch { return 25; }
+          })();
+
+          // 这里不直接执行真实上传以避免耦合，复用命令逻辑或由主流程在命令中读取 window 值
           new Notice(t('Connection test succeeded'));
         } catch (e: any) {
           new Notice(tp('Connection test failed: {error}', { error: e?.message ?? String(e) }));

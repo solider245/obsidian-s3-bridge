@@ -187,6 +187,8 @@ export default class ObS3GeminiPlugin extends Plugin {
           key,
           contentType: payload.mime || 'application/octet-stream',
           bodyBase64: payload.base64,
+          presignTimeoutMs: Math.max(1000, Number((window as any).__obS3_presignTimeout__ ?? 10000)),
+          uploadTimeoutMs: Math.max(1000, Number((window as any).__obS3_uploadTimeout__ ?? 25000)),
         });
 
         // 成功：替换最终 URL，清理缓存
@@ -328,6 +330,8 @@ export default class ObS3GeminiPlugin extends Plugin {
             key,
             contentType: clip.mime || 'application/octet-stream',
             bodyBase64: clip.base64,
+            presignTimeoutMs: Math.max(1000, Number((window as any).__obS3_presignTimeout__ ?? 10000)),
+            uploadTimeoutMs: Math.max(1000, Number((window as any).__obS3_uploadTimeout__ ?? 25000)),
           });
 
           const md = `![](${publicUrl})`;
@@ -485,6 +489,8 @@ export default class ObS3GeminiPlugin extends Plugin {
                 key,
                 contentType: mime,
                 bodyBase64: base64,
+                presignTimeoutMs: Math.max(1000, Number((window as any).__obS3_presignTimeout__ ?? 10000)),
+                uploadTimeoutMs: Math.max(1000, Number((window as any).__obS3_uploadTimeout__ ?? 25000)),
               });
 
               // 成功：替换为最终 URL，并释放本地资源与缓存
