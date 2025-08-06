@@ -1,8 +1,7 @@
 import { App, PluginSettingTab } from 'obsidian';
 import MyPlugin from './main';
 import { renderProfilesSection, renderProfileForm } from './src/settings/profileManager';
-import { renderTempAttachSettings } from './src/settings/tempSettings';
-import { renderActions, renderHistorySection, renderLogsSection, renderAdvancedSection } from './src/settings/uiComponents';
+import { renderActions, renderActivityLogSection } from './src/settings/uiComponents';
 
 export interface MyPluginSettings {
   enableTempLocal?: boolean;
@@ -31,9 +30,6 @@ export class MyPluginSettingTab extends PluginSettingTab {
     renderProfilesSection(this.plugin, containerEl, () => this.display());
     renderProfileForm(this.plugin, containerEl, () => this.display());
     renderActions(containerEl);
-    renderTempAttachSettings(this.app, containerEl);
-    renderHistorySection(containerEl);
-    renderLogsSection(containerEl);
-    renderAdvancedSection(containerEl);
+    renderActivityLogSection(this.app, containerEl);
   }
 }

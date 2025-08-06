@@ -5,7 +5,7 @@ import { performUpload } from '../upload/performUpload';
 import { t, tp } from '../l10n';
 import { makeObjectKey } from '../core/objectKey';
 import { buildPublicUrl, loadS3Config } from '../../s3/s3Manager';
-import { logger } from '../logger';
+import { activityLog } from '../activityLog';
 
 export interface PasteCtx {
   plugin: Plugin;
@@ -55,7 +55,11 @@ export function installPasteHandler(ctx: PasteCtx): void {
           const errorMsg = e?.message ?? String(e);
           editor.replaceSelection(`![Upload Failed: ${file.name}]()`);
           new Notice(tp('Upload failed: {error}', { error: errorMsg }));
-          logger.error('Paste upload failed', { error: errorMsg, fileName: file.name });
+          await activityLog.add(plugin.app, 'upload_error', {
+            error: errorMsg,
+            fileName: file.name,
+            source: 'paste',
+          });
           return;
         }
 
@@ -72,12 +76,19 @@ export function installPasteHandler(ctx: PasteCtx): void {
         }
 
         new Notice(t('Image uploaded successfully!'));
-        logger.info('Paste upload success', { url: finalUrl, fileName: file.name });
+        await activityLog.add(plugin.app, 'upload_success', {
+          url: finalUrl,
+          fileName: file.name,
+          source: 'paste',
+        });
 
       } catch (e: any) {
         const errorMsg = e?.message ?? String(e);
         new Notice(tp('Upload failed: {error}', { error: errorMsg }));
-        logger.error('Paste upload unexpected error', { error: errorMsg });
+        await activityLog.add(plugin.app, 'upload_error', {
+          error: errorMsg,
+          source: 'paste_unexpected',
+        });
       }
     })
   );
