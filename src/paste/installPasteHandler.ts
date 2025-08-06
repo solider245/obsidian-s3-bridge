@@ -44,6 +44,7 @@ export function installPasteHandler(ctx: PasteCtx): void {
         const key = makeObjectKey(file.name, ext, config.keyPrefix || '');
 
         let finalUrl = '';
+        const startTime = Date.now();
         try {
           await performUpload(plugin, {
             key,
@@ -75,11 +76,15 @@ export function installPasteHandler(ctx: PasteCtx): void {
             editor.replaceSelection(markdownLink);
         }
 
-        new Notice(t('Image uploaded successfully!'));
+        const duration = Date.now() - startTime;
+        const sizeMB = (file.size / 1024 / 1024).toFixed(2);
+        new Notice(tp('Upload successful! Time: {duration}ms, Size: {size}MB', { duration, size: sizeMB }));
         await activityLog.add(plugin.app, 'upload_success', {
           url: finalUrl,
           fileName: file.name,
           source: 'paste',
+          size: file.size,
+          duration,
         });
 
       } catch (e: any) {
