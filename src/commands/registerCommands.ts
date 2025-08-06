@@ -9,6 +9,7 @@ import type { Editor, Plugin } from 'obsidian';
 import { Notice, MarkdownView } from 'obsidian';
 import { t, tp } from '../l10n';
 import { loadS3Config } from '../../s3/s3Manager';
+import { runCheck } from '../features/runCheck';
 import { performUpload } from '../upload/performUpload';
 import { processNext } from '../queue/processNext';
 import { createQueueScheduler } from '../scheduler/queueScheduler';
@@ -58,13 +59,9 @@ export function registerCommands(ctx: RegisterCtx) {
   // 测试连接
   plugin.addCommand({
     id: 'obs3gemini-test-connection',
-    name: t('Test Connection'),
+    name: t('Check and Test Connection'),
     callback: async () => {
-      try {
-        new Notice(t('Connection test succeeded'));
-      } catch (e: any) {
-        new Notice(tp('Connection test failed: {error}', { error: e?.message ?? String(e) }));
-      }
+      await runCheck(plugin);
     },
   });
 
