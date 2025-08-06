@@ -15,7 +15,7 @@ function safeLoadZhCN(): any {
     // @ts-ignore
     pack = require('../lang/zh-CN.json');
   } catch {
-    console.warn('[ob-s3-gemini] zh-CN language pack not bundled, fallback to English.');
+    // ignore if zh-CN not bundled
   }
   return pack;
 }
