@@ -11,50 +11,17 @@ import { t, tp } from '../l10n';
 import { loadS3Config } from '../../s3/s3Manager';
 import { runCheck } from '../features/runCheck';
 import { performUpload } from '../upload/performUpload';
-import { processNext } from '../queue/processNext';
-import { createQueueScheduler } from '../scheduler/queueScheduler';
+import { makeObjectKey } from '../core/objectKey';
 
 export interface RegisterCtx {
   plugin: Plugin;
-  makeObjectKey: (originalName: string | null, ext: string, prefix: string, uploadId?: string, dateFormat?: string) => string;
   getExt: (mime: string) => string;
   ensureWithinLimitOrConfirm: (bytes: number, limitBytes?: number) => Promise<boolean>;
   readClipboardImageAsBase64: () => Promise<{ base64: string; mime: string; size?: number } | null>;
-  generateUploadId: () => string;
-}
-
-// 队列项结构，复用 saveData.uploadQueue
-type QueueItem = {
-  id: string;
-  filename: string;
-  mime: string;
-  path: string;
-  createdAt: number;
-  size?: number;
-  base64Length?: number;
-};
-
-async function loadQueue(plugin: Plugin): Promise<QueueItem[]> {
-  const existing = (await (plugin as any).loadData()) ?? {};
-  return Array.isArray(existing.uploadQueue) ? (existing.uploadQueue as QueueItem[]) : [];
-}
-// Scheduler 单例（模块级变量，避免重复创建）
-let __scheduler__: ReturnType<typeof createQueueScheduler> | null = null;
-function getScheduler(plugin: Plugin) {
-  if (!__scheduler__) {
-    __scheduler__ = createQueueScheduler(plugin, { intervalMs: 2500 });
-  }
-  return __scheduler__;
-}
-
-async function saveQueue(plugin: Plugin, list: QueueItem[]): Promise<void> {
-  const existing = (await (plugin as any).loadData()) ?? {};
-  (existing as any).uploadQueue = list;
-  await (plugin as any).saveData(existing);
 }
 
 export function registerCommands(ctx: RegisterCtx) {
-  const { plugin, makeObjectKey, getExt, ensureWithinLimitOrConfirm, readClipboardImageAsBase64, generateUploadId } = ctx;
+  const { plugin, getExt, ensureWithinLimitOrConfirm, readClipboardImageAsBase64 } = ctx;
 
   // 测试连接
   plugin.addCommand({
@@ -101,8 +68,7 @@ export function registerCommands(ctx: RegisterCtx) {
         const ext = getExt(mime);
         const cfgNow = await loadS3Config(plugin);
         const keyPrefix = (cfgNow.keyPrefix || '').replace(/^\/+|\/+$/g, '');
-        const uploadId = generateUploadId();
-        const key = makeObjectKey(choice.name || null, ext, keyPrefix, uploadId, (window as any).__obS3_keyPrefixFormat__);
+        const key = makeObjectKey(choice.name || 'clipboard-upload', ext, keyPrefix);
 
         const url = await performUpload(plugin, { key, mime, base64 });
 
@@ -115,40 +81,6 @@ export function registerCommands(ctx: RegisterCtx) {
             const safeName = (choice.name || key.split('/').pop() || 'file').replace(/\]/g, '');
             editor.replaceSelection(`[${safeName}](${url})`);
           }
-        }
-      } catch (e: any) {
-        new Notice(tp('Upload failed: {error}', { error: e?.message ?? String(e) }));
-      }
-    },
-  });
-
-  // 队列状态调试
-  plugin.addCommand({
-    id: 'obs3gemini-queue-status',
-    name: 'Queue: Status',
-    callback: async () => {
-      try {
-        const list = await loadQueue(plugin);
-        const n = list.length;
-        const head = list.slice(0, 5).map((x: QueueItem) => `${x.id} ${x.filename}`).join('\n');
-        new Notice(n > 0 ? `Queue length: ${n}\n${head}` : 'Queue empty');
-      } catch (e: any) {
-        new Notice(tp('Operation failed: {error}', { error: e?.message ?? String(e) }));
-      }
-    },
-  });
-
-  // 处理下一条队列
-  plugin.addCommand({
-    id: 'obs3gemini-queue-process-next',
-    name: 'Queue: Process Next Item',
-    callback: async () => {
-      try {
-        const { processed } = await processNext(plugin);
-        if (processed) {
-          new Notice('Queue processed 1 item');
-        } else {
-          // processNext 内部已经提示了失败原因（例如本地缺失与无缓存）
         }
       } catch (e: any) {
         new Notice(tp('Upload failed: {error}', { error: e?.message ?? String(e) }));
@@ -179,10 +111,9 @@ export function registerCommands(ctx: RegisterCtx) {
         }
 
         const ext = getExt(clip.mime);
-        const uploadId = generateUploadId();
         const cfgNow = await loadS3Config(plugin);
         const keyPrefix = (cfgNow.keyPrefix || '').replace(/^\/+|\/+$/g, '');
-        const key = makeObjectKey(null, ext, keyPrefix, uploadId, (window as any).__obS3_keyPrefixFormat__);
+        const key = makeObjectKey('clipboard-upload', ext, keyPrefix);
 
         const url = await performUpload(plugin, { key, mime: clip.mime || 'application/octet-stream', base64: clip.base64 });
 
@@ -197,63 +128,6 @@ export function registerCommands(ctx: RegisterCtx) {
       }
     },
   });
-  // ============ Scheduler Commands ============
-  // Scheduler: Start
-  plugin.addCommand({
-    id: 'obs3gemini-scheduler-start',
-    name: 'Scheduler: Start',
-    callback: async () => {
-      try {
-        const sch = getScheduler(plugin);
-        if (sch.isRunning()) {
-          new Notice('Scheduler already running');
-          return;
-        }
-        sch.start();
-        new Notice('Scheduler started');
-      } catch (e: any) {
-        new Notice(tp('Operation failed: {error}', { error: e?.message ?? String(e) }));
-      }
-    },
-  });
-
-  // Scheduler: Stop
-  plugin.addCommand({
-    id: 'obs3gemini-scheduler-stop',
-    name: 'Scheduler: Stop',
-    callback: async () => {
-      try {
-        const sch = getScheduler(plugin);
-        if (!sch.isRunning()) {
-          new Notice('Scheduler not running');
-          return;
-        }
-        sch.stop();
-        new Notice('Scheduler stopped');
-      } catch (e: any) {
-        new Notice(tp('Operation failed: {error}', { error: e?.message ?? String(e) }));
-      }
-    },
-  });
-
-  // Scheduler: Status
-  plugin.addCommand({
-    id: 'obs3gemini-scheduler-status',
-    name: 'Scheduler: Status',
-    callback: async () => {
-      try {
-        const sch = getScheduler(plugin);
-        const st = sch.status();
-        const list = await loadQueue(plugin);
-        new Notice(`Scheduler status:
-running=${st.running} inFlight=${st.inFlight} intervalMs=${st.intervalMs}
-queueLength=${list.length}`);
-      } catch (e: any) {
-        new Notice(tp('Operation failed: {error}', { error: e?.message ?? String(e) }));
-      }
-    },
-  });
-
 }
  
 export default { registerCommands };
