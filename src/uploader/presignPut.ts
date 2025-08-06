@@ -69,11 +69,13 @@ export async function getPresignedPutUrl(
   timeoutMs?: number
 ): Promise<string> {
   const { client, bucket } = buildS3Client(plugin);
+  const cfg = loadS3Config(plugin);
 
   const cmd = new PutObjectCommand({
     Bucket: bucket,
     Key: key,
     ContentType: contentType || 'application/octet-stream',
+    CacheControl: cfg.cacheControl,
   });
 
   const to = typeof timeoutMs === 'number' && timeoutMs > 0

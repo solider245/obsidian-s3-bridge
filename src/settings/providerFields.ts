@@ -23,6 +23,7 @@ export const PROVIDER_MANIFEST: Record<ProviderType, FormField[]> = {
     { key: 'useSSL', label: 'Use SSL', placeholder: '', note: '建议开启。', required: true, defaultValue: true, type: 'toggle' },
     { key: 'baseUrl', label: 'Public Base URL', placeholder: 'https://<bucket>.r2.dev 或你的自定义域', note: '用于拼接可访问链接，不用于 API。', required: false },
     { key: 'keyPrefix', label: 'Key Prefix', placeholder: 'images/ 或 yyyy/mm/dd/', note: '对象键前缀，可选。', required: false },
+    { key: 'cacheControl', label: 'Cache-Control', placeholder: 'public, max-age=31536000, immutable', note: 'HTTP 缓存头，用于离线访问，默认为一年。', required: false, defaultValue: 'public, max-age=31536000, immutable' },
   ],
   'minio': [
     { key: 'name', label: '配置名称', placeholder: '例如：本地测试 MinIO', note: '给你自己看的一个友好名称。', required: true },
@@ -34,6 +35,7 @@ export const PROVIDER_MANIFEST: Record<ProviderType, FormField[]> = {
     { key: 'useSSL', label: 'Use SSL', placeholder: '', note: '与 endpoint 协议保持一致。', required: true, defaultValue: false, type: 'toggle' },
     { key: 'baseUrl', label: 'Public Base URL', placeholder: '可为空', note: '用于拼接可访问链接，不用于 API。', required: false },
     { key: 'keyPrefix', label: 'Key Prefix', placeholder: 'images/ 或 yyyy/mm/dd/', note: '对象键前缀，可选。', required: false },
+    { key: 'cacheControl', label: 'Cache-Control', placeholder: 'public, max-age=31536000, immutable', note: 'HTTP 缓存头，用于离线访问，默认为一年。', required: false, defaultValue: 'public, max-age=31536000, immutable' },
   ],
   'aws-s3': [
     { key: 'name', label: '配置名称', placeholder: '例如：AWS 正式环境', note: '给你自己看的一个友好名称。', required: true },
@@ -45,6 +47,7 @@ export const PROVIDER_MANIFEST: Record<ProviderType, FormField[]> = {
     { key: 'useSSL', label: 'Use SSL', placeholder: '', note: '建议开启。', required: true, defaultValue: true, type: 'toggle' },
     { key: 'baseUrl', label: 'Public Base URL', placeholder: '可为空或自定义域', note: '用于拼接可访问链接，不用于 API。', required: false },
     { key: 'keyPrefix', label: 'Key Prefix', placeholder: 'images/ 或 yyyy/mm/dd/', note: '对象键前缀，可选。', required: false },
+    { key: 'cacheControl', label: 'Cache-Control', placeholder: 'public, max-age=31536000, immutable', note: 'HTTP 缓存头，用于离线访问，默认为一年。', required: false, defaultValue: 'public, max-age=31536000, immutable' },
   ],
   'custom': [
     { key: 'name', label: '配置名称', placeholder: '例如：自定义兼容 S3', note: '给你自己看的一个友好名称。', required: true },
@@ -56,5 +59,6 @@ export const PROVIDER_MANIFEST: Record<ProviderType, FormField[]> = {
     { key: 'useSSL', label: 'Use SSL', placeholder: '', note: '与 endpoint 协议保持一致。', required: true, defaultValue: true, type: 'toggle' },
     { key: 'baseUrl', label: 'Public Base URL', placeholder: '可为空或自定义域', note: '用于拼接可访问链接，不用于 API。', required: false },
     { key: 'keyPrefix', label: 'Key Prefix', placeholder: 'images/ 或 yyyy/mm/dd/', note: '对象键前缀，可选。', required: false },
+    { key: 'cacheControl', label: 'Cache-Control', placeholder: 'public, max-age=31536000, immutable', note: 'HTTP 缓存头，用于离线访问，默认为一年。', required: false, defaultValue: 'public, max-age=31536000, immutable' },
   ],
 };

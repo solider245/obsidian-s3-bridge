@@ -14,6 +14,7 @@ export interface S3Config {
   keyPrefix?: string;
   useSSL: boolean;
   baseUrl?: string;
+  cacheControl?: string;
 }
 
 /**
@@ -34,6 +35,7 @@ export interface S3Profile {
   useSSL: boolean;
   baseUrl?: string;          // 公共访问域名，用于拼接展示链接
   maxUploadMB?: number;      // 新增：每个 Profile 的最大上传大小（MB），默认 5
+  cacheControl?: string;     // 新增：S3 对象的 Cache-Control 头
 }
 
 /**
@@ -74,6 +76,7 @@ function createEmptyProfile(overrides: Partial<S3Profile> = {}): S3Profile {
     useSSL: overrides.useSSL ?? true,
     baseUrl: overrides.baseUrl ?? '',
     maxUploadMB: overrides.maxUploadMB ?? 5,
+    cacheControl: overrides.cacheControl ?? 'public, max-age=31536000, immutable',
   };
 }
 
@@ -324,6 +327,7 @@ export function saveS3Config(plugin: Plugin, config: S3Config): void {
     useSSL: (config as any).useSSL ?? true,
     keyPrefix: config.keyPrefix ?? '',
     baseUrl: (config as any).baseUrl ?? '',
+    cacheControl: (config as any).cacheControl ?? '',
   };
   // 如果 current 不在列表中，插入，并设为 current
   if (!data.profiles.some(p => p.id === current.id)) {
