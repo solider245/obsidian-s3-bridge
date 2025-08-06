@@ -76,15 +76,15 @@ export function installPasteHandler(ctx: PasteCtx): void {
             editor.replaceSelection(markdownLink);
         }
 
-        const duration = Date.now() - startTime;
+        const durationInSeconds = ((Date.now() - startTime) / 1000).toFixed(2);
         const sizeMB = (file.size / 1024 / 1024).toFixed(2);
-        new Notice(tp('Upload successful! Time: {duration}ms, Size: {size}MB', { duration, size: sizeMB }));
+        new Notice(tp('Upload successful! Time: {duration}s, Size: {size}MB', { duration: durationInSeconds, size: sizeMB }));
         await activityLog.add(plugin.app, 'upload_success', {
           url: finalUrl,
           fileName: file.name,
           source: 'paste',
           size: file.size,
-          duration,
+          duration: parseFloat(durationInSeconds),
         });
 
       } catch (e: any) {

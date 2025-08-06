@@ -44,7 +44,7 @@ export function renderActivityLogSection(app: App, containerEl: HTMLElement) {
       let message = '';
       if (log.event === 'upload_success' && log.details) {
         const sizeMB = log.details.size ? (log.details.size / 1024 / 1024).toFixed(2) : 'N/A';
-        const duration = log.details.duration ? `${log.details.duration}ms` : 'N/A';
+        const duration = log.details.duration ? `${log.details.duration}s` : 'N/A';
         message = `File: ${log.details.fileName}, Size: ${sizeMB}MB, Duration: ${duration}, URL: ${log.details.url}`;
       } else {
         message = JSON.stringify(log.details);
