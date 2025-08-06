@@ -46,6 +46,12 @@ export const activityLog = {
     return data.activities;
   },
 
+  async delete(app: App, timestamp: string): Promise<void> {
+    const data = await readData(app);
+    data.activities = data.activities.filter(log => log.timestamp !== timestamp);
+    await writeData(app, data);
+  },
+
   async clear(app: App): Promise<void> {
     await writeData(app, { activities: [] });
   }
