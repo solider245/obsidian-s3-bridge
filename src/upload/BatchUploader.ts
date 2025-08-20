@@ -7,6 +7,7 @@
 import { configManager } from '../config/ConfigurationManager'
 import { errorHandler, withErrorHandling, AppError } from '../error/ErrorHandler'
 import { UploadProgressManager } from '../utils/uploadProgress'
+import { enhancedProgressManager } from '../utils/enhancedProgress'
 import { performUpload } from '../upload/performUpload'
 
 export interface UploadItem {
@@ -110,6 +111,9 @@ export class BatchUploader {
 
       this.items.push(item)
       ids.push(id)
+      
+      // 初始化增强进度跟踪
+      enhancedProgressManager.startUpload(id, file.name, file.size)
     })
 
     this.notifyProgress()
@@ -349,13 +353,20 @@ export class BatchUploader {
           item.progress = progress
           item.speed = speed
           item.eta = eta
+          
+          // 更新增强进度
+          const uploadedBytes = (progress * item.metadata.size) / 100
+          enhancedProgressManager.updateProgress(item.id, progress, uploadedBytes)
+          
           this.notifyProgress()
         },
         onSuccess: (url) => {
           item.url = url
+          enhancedProgressManager.completeUpload(item.id, url)
           resolve()
         },
         onError: (error) => {
+          enhancedProgressManager.failUpload(item.id, error.message, item.retryCount)
           reject(error)
         }
       })

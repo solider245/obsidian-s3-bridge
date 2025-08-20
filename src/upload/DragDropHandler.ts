@@ -7,6 +7,7 @@
 import { configManager } from '../config/ConfigurationManager'
 import { errorHandler, withErrorHandling } from '../error/ErrorHandler'
 import { getGlobalBatchUploader } from '../upload/BatchUploader'
+import { enhancedProgressManager } from '../utils/enhancedProgress'
 import { Notice } from 'obsidian'
 
 export interface DragDropOptions {
@@ -548,6 +549,11 @@ export class EditorDragDropHandler implements DragDropHandler {
       const addedIds = batchUploader.addFiles(files)
       
       if (addedIds.length > 0) {
+        // 初始化增强进度跟踪
+        files.forEach((file, index) => {
+          enhancedProgressManager.startUpload(addedIds[index], file.name, file.size)
+        })
+        
         new Notice(`已添加 ${addedIds.length} 个文件到上传队列`)
         
         // 如果启用了自动开始上传

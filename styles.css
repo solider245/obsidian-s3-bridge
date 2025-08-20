@@ -17,6 +17,216 @@ If your plugin does not need CSS, delete this file.
   transition: all 0.3s ease;
 }
 
+/* 增强的进度反馈样式 */
+.batch-upload-enhanced-stats {
+  margin: 20px 0;
+  padding: 15px;
+  background-color: var(--background-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+}
+
+.batch-upload-enhanced-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 15px;
+}
+
+.batch-upload-enhanced-stat-item {
+  text-align: center;
+  padding: 10px;
+  background-color: var(--background-primary);
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+}
+
+.batch-upload-enhanced-stat-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+
+.batch-upload-enhanced-stat-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+/* 速度图表样式 */
+.batch-upload-speed-chart {
+  margin: 20px 0;
+  padding: 15px;
+  background-color: var(--background-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+}
+
+.batch-upload-speed-chart-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-normal);
+  margin-bottom: 10px;
+}
+
+.batch-upload-speed-chart-container {
+  width: 100%;
+  height: 100px;
+  background-color: var(--background-primary);
+  border-radius: 4px;
+  border: 1px solid var(--background-modifier-border);
+  overflow: hidden;
+}
+
+.batch-upload-speed-chart-canvas {
+  width: 100%;
+  height: 100%;
+}
+
+/* 增强的文件项目样式 */
+.batch-upload-item-enhanced-info {
+  display: flex;
+  gap: 10px;
+  margin-top: 5px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.batch-upload-item-speed {
+  flex: 1;
+  padding: 2px 6px;
+  background-color: var(--background-modifier-error);
+  color: var(--text-error);
+  border-radius: 3px;
+  font-weight: 500;
+}
+
+.batch-upload-item-eta {
+  flex: 1;
+  padding: 2px 6px;
+  background-color: var(--background-modifier-info);
+  color: var(--text-info);
+  border-radius: 3px;
+  font-weight: 500;
+}
+
+.batch-upload-item-warnings {
+  flex: 2;
+  padding: 2px 6px;
+  background-color: var(--background-modifier-warning);
+  color: var(--text-warning);
+  border-radius: 3px;
+  font-weight: 500;
+  display: none;
+}
+
+.batch-upload-item-warnings:empty {
+  display: none;
+}
+
+/* 上传状态徽章增强 */
+.batch-upload-status-badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.batch-upload-status-uploading {
+  background-color: var(--background-modifier-info);
+  color: var(--text-info);
+  animation: pulse 2s infinite;
+}
+
+.batch-upload-status-completed {
+  background-color: var(--background-modifier-success);
+  color: var(--text-success);
+}
+
+.batch-upload-status-failed {
+  background-color: var(--background-modifier-error);
+  color: var(--text-error);
+}
+
+.batch-upload-status-paused {
+  background-color: var(--background-modifier-warning);
+  color: var(--text-warning);
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* 进度条增强 */
+.batch-upload-progress-fill {
+  transition: width 0.3s ease;
+  background: linear-gradient(90deg, var(--interactive-accent), var(--interactive-accent-hover));
+}
+
+.batch-upload-item-progress-fill {
+  transition: width 0.3s ease;
+  background: linear-gradient(90deg, var(--color-accent), var(--color-accent-hover));
+}
+
+/* 拖拽状态增强 */
+.batch-upload-drag-over {
+  background-color: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+  transform: scale(1.02);
+}
+
+/* 通知样式增强 */
+.batch-upload-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  min-width: 300px;
+  max-width: 500px;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.batch-upload-notification.info {
+  background-color: var(--background-secondary);
+  border-left: 4px solid var(--text-info);
+}
+
+.batch-upload-notification.success {
+  background-color: var(--background-secondary);
+  border-left: 4px solid var(--text-success);
+}
+
+.batch-upload-notification.warning {
+  background-color: var(--background-secondary);
+  border-left: 4px solid var(--text-warning);
+}
+
+.batch-upload-notification.error {
+  background-color: var(--background-secondary);
+  border-left: 4px solid var(--text-error);
+}
+
 .batch-upload-selection:hover {
   border-color: var(--interactive-accent);
   background-color: var(--background-secondary);

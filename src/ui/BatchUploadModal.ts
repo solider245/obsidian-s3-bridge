@@ -6,6 +6,8 @@
 
 import { BatchUploader, UploadItem, BatchProgress } from '../upload/BatchUploader'
 import { configManager } from '../config/ConfigurationManager'
+import { enhancedProgressManager, EnhancedProgressUpdate } from '../utils/enhancedProgress'
+import { smartNotificationManager } from '../utils/smartNotifications'
 import { Notice } from 'obsidian'
 
 export class BatchUploadModal extends Modal {
@@ -15,6 +17,9 @@ export class BatchUploadModal extends Modal {
   private itemsListEl: HTMLElement
   private controlsEl: HTMLElement
   private statsEl: HTMLElement
+  private enhancedStatsEl: HTMLElement
+  private speedChartEl: HTMLElement
+  private progressListeners = new Map<string, () => void>()
 
   constructor(app: App) {
     super(app)
@@ -28,6 +33,9 @@ export class BatchUploadModal extends Modal {
       onError: (error, item) => this.onError(error, item),
       onItemComplete: (item) => this.onItemComplete(item)
     })
+    
+    // 设置增强进度监听器
+    this.setupEnhancedProgressListeners()
   }
 
   onOpen() {
@@ -50,6 +58,12 @@ export class BatchUploadModal extends Modal {
 
     // 创建统计信息区域
     this.createStatsArea()
+    
+    // 创建增强统计区域
+    this.createEnhancedStatsArea()
+    
+    // 创建速度图表区域
+    this.createSpeedChartArea()
 
     // 初始化拖拽
     this.setupDragDrop()
@@ -59,6 +73,7 @@ export class BatchUploadModal extends Modal {
     const { contentEl } = this
     contentEl.empty()
     this.uploader.stop()
+    this.cleanupEnhancedProgressListeners()
   }
 
   /**
@@ -88,7 +103,8 @@ export class BatchUploadModal extends Modal {
     fileInput.addEventListener('change', (e) => {
       const files = (e.target as HTMLInputElement).files
       if (files && files.length > 0) {
-        this.uploader.addFiles(files)
+        const addedIds = this.uploader.addFiles(files)
+        this.initializeEnhancedProgress(addedIds, Array.from(files))
         this.updateItemsList()
       }
     })
@@ -309,12 +325,21 @@ export class BatchUploadModal extends Modal {
     }
 
     items.forEach(item => {
-      const itemEl = this.itemsListEl.createDiv({ cls: 'batch-upload-item' })
+      const itemEl = this.itemsListEl.createDiv({ 
+        cls: 'batch-upload-item',
+        attr: { 'data-upload-id': item.id }
+      })
       
       // 文件信息
       const fileInfo = itemEl.createDiv({ cls: 'batch-upload-item-info' })
       fileInfo.createDiv({ cls: 'batch-upload-item-name', text: item.metadata.name })
       fileInfo.createDiv({ cls: 'batch-upload-item-size', text: this.formatSize(item.metadata.size) })
+      
+      // 增强的进度信息
+      const enhancedInfo = itemEl.createDiv({ cls: 'batch-upload-item-enhanced-info' })
+      enhancedInfo.createDiv({ cls: 'batch-upload-item-speed', text: '0 B/s' })
+      enhancedInfo.createDiv({ cls: 'batch-upload-item-eta', text: '计算中...' })
+      enhancedInfo.createDiv({ cls: 'batch-upload-item-warnings', text: '' })
       
       // 状态和进度
       const itemStatus = itemEl.createDiv({ cls: 'batch-upload-item-status' })
@@ -471,5 +496,226 @@ export class BatchUploadModal extends Modal {
       'cancelled': '已取消'
     }
     return statusMap[status as keyof typeof statusMap] || status
+  }
+
+  /**
+   * 设置增强进度监听器
+   */
+  private setupEnhancedProgressListeners(): void {
+    enhancedProgressManager.addListener((update: EnhancedProgressUpdate) => {
+      this.updateEnhancedProgress(update)
+    })
+  }
+
+  /**
+   * 清理增强进度监听器
+   */
+  private cleanupEnhancedProgressListeners(): void {
+    this.progressListeners.forEach(listener => listener())
+    this.progressListeners.clear()
+  }
+
+  /**
+   * 初始化增强进度
+   */
+  private initializeEnhancedProgress(ids: string[], files: File[]): void {
+    ids.forEach((id, index) => {
+      const file = files[index]
+      enhancedProgressManager.startUpload(id, file.name, file.size)
+    })
+  }
+
+  /**
+   * 更新增强进度
+   */
+  private updateEnhancedProgress(update: EnhancedProgressUpdate): void {
+    this.updateEnhancedStats(update)
+    this.updateSpeedChart(update)
+    this.updateItemsListEnhanced(update)
+  }
+
+  /**
+   * 创建增强统计区域
+   */
+  private createEnhancedStatsArea(): void {
+    this.enhancedStatsEl = this.contentEl.createDiv({ cls: 'batch-upload-enhanced-stats' })
+    
+    const statsGrid = this.enhancedStatsEl.createDiv({ cls: 'batch-upload-enhanced-stats-grid' })
+    
+    // 当前速度
+    statsGrid.createDiv({ cls: 'batch-upload-enhanced-stat-item' })
+      .createEl('div', { cls: 'batch-upload-enhanced-stat-label', text: '当前速度' })
+      .parentElement?.createDiv({ 
+        cls: 'batch-upload-enhanced-stat-value batch-upload-current-speed',
+        text: '0 B/s'
+      })
+    
+    // 平均速度
+    statsGrid.createDiv({ cls: 'batch-upload-enhanced-stat-item' })
+      .createEl('div', { cls: 'batch-upload-enhanced-stat-label', text: '平均速度' })
+      .parentElement?.createDiv({ 
+        cls: 'batch-upload-enhanced-stat-value batch-upload-average-speed',
+        text: '0 B/s'
+      })
+    
+    // 峰值速度
+    statsGrid.createDiv({ cls: 'batch-upload-enhanced-stat-item' })
+      .createEl('div', { cls: 'batch-upload-enhanced-stat-label', text: '峰值速度' })
+      .parentElement?.createDiv({ 
+        cls: 'batch-upload-enhanced-stat-value batch-upload-peak-speed',
+        text: '0 B/s'
+      })
+    
+    // 总耗时
+    statsGrid.createDiv({ cls: 'batch-upload-enhanced-stat-item' })
+      .createEl('div', { cls: 'batch-upload-enhanced-stat-label', text: '总耗时' })
+      .parentElement?.createDiv({ 
+        cls: 'batch-upload-enhanced-stat-value batch-upload-total-time',
+        text: '0秒'
+      })
+  }
+
+  /**
+   * 创建速度图表区域
+   */
+  private createSpeedChartArea(): void {
+    this.speedChartEl = this.contentEl.createDiv({ cls: 'batch-upload-speed-chart' })
+    
+    const chartTitle = this.speedChartEl.createEl('div', { 
+      cls: 'batch-upload-speed-chart-title',
+      text: '速度趋势'
+    })
+    
+    const chartContainer = this.speedChartEl.createDiv({ cls: 'batch-upload-speed-chart-container' })
+    const chartCanvas = chartContainer.createEl('canvas', { 
+      cls: 'batch-upload-speed-chart-canvas',
+      attr: { width: '400', height: '100' }
+    })
+    
+    // 初始化图表
+    this.initializeSpeedChart(chartCanvas as HTMLCanvasElement)
+  }
+
+  /**
+   * 初始化速度图表
+   */
+  private initializeSpeedChart(canvas: HTMLCanvasElement): void {
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    
+    // 设置画布大小
+    canvas.width = canvas.offsetWidth
+    canvas.height = 100
+    
+    // 绘制网格
+    this.drawSpeedChartGrid(ctx, canvas.width, canvas.height)
+  }
+
+  /**
+   * 绘制速度图表网格
+   */
+  private drawSpeedChartGrid(ctx: CanvasRenderingContext2D, width: number, height: number): void {
+    ctx.clearRect(0, 0, width, height)
+    ctx.strokeStyle = 'var(--text-muted)'
+    ctx.lineWidth = 1
+    
+    // 绘制水平线
+    for (let i = 0; i <= 4; i++) {
+      const y = (height / 4) * i
+      ctx.beginPath()
+      ctx.moveTo(0, y)
+      ctx.lineTo(width, y)
+      ctx.stroke()
+    }
+  }
+
+  /**
+   * 更新增强统计
+   */
+  private updateEnhancedStats(update: EnhancedProgressUpdate): void {
+    const currentSpeedEl = this.enhancedStatsEl.querySelector('.batch-upload-current-speed') as HTMLElement
+    const averageSpeedEl = this.enhancedStatsEl.querySelector('.batch-upload-average-speed') as HTMLElement
+    const peakSpeedEl = this.enhancedStatsEl.querySelector('.batch-upload-peak-speed') as HTMLElement
+    const totalTimeEl = this.enhancedStatsEl.querySelector('.batch-upload-total-time') as HTMLElement
+
+    if (currentSpeedEl) {
+      currentSpeedEl.textContent = this.formatSpeed(update.speed)
+    }
+    
+    if (averageSpeedEl) {
+      averageSpeedEl.textContent = this.formatSpeed(update.averageSpeed)
+    }
+    
+    if (peakSpeedEl) {
+      peakSpeedEl.textContent = this.formatSpeed(update.peakSpeed)
+    }
+    
+    if (totalTimeEl) {
+      totalTimeEl.textContent = this.formatTime(update.timeElapsed)
+    }
+  }
+
+  /**
+   * 更新速度图表
+   */
+  private updateSpeedChart(update: EnhancedProgressUpdate): void {
+    const canvas = this.speedChartEl.querySelector('.batch-upload-speed-chart-canvas') as HTMLCanvasElement
+    if (!canvas) return
+    
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    
+    // 简单的速度图表实现
+    this.drawSpeedChartGrid(ctx, canvas.width, canvas.height)
+    
+    // 这里可以添加更复杂的速度图表绘制逻辑
+    // 例如：绘制速度曲线、显示历史数据等
+  }
+
+  /**
+   * 更新增强的文件列表
+   */
+  private updateItemsListEnhanced(update: EnhancedProgressUpdate): void {
+    const itemEl = this.itemsListEl.querySelector(`[data-upload-id="${update.id}"]`)
+    if (!itemEl) return
+    
+    // 更新速度信息
+    const speedEl = itemEl.querySelector('.batch-upload-item-speed') as HTMLElement
+    if (speedEl) {
+      speedEl.textContent = this.formatSpeed(update.speed)
+    }
+    
+    // 更新ETA信息
+    const etaEl = itemEl.querySelector('.batch-upload-item-eta') as HTMLElement
+    if (etaEl) {
+      etaEl.textContent = this.formatTime(update.eta)
+    }
+    
+    // 更新警告信息
+    const warningEl = itemEl.querySelector('.batch-upload-item-warnings') as HTMLElement
+    if (warningEl && update.warnings.length > 0) {
+      warningEl.textContent = update.warnings.join(', ')
+      warningEl.style.display = 'block'
+    }
+  }
+
+  /**
+   * 格式化速度
+   */
+  private formatSpeed(bytesPerSecond: number): string {
+    if (bytesPerSecond === 0) return '0 B/s'
+    const k = 1024
+    const sizes = ['B', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytesPerSecond) / Math.log(k))
+    return parseFloat((bytesPerSecond / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i] + '/s'
+  }
+
+  /**
+   * 格式化时间
+   */
+  private formatTime(seconds: number): string {
+    if (seconds < 60) return `${Math.round(seconds)}秒`
+    if (seconds < 3600) return `${Math.round(seconds / 60)}分钟`
+    return `${Math.round(seconds / 3600)}小时`
   }
 }
