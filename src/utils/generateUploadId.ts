@@ -3,10 +3,10 @@
 // 依赖: 无（纯函数）
 
 export function generateUploadId(): string {
-  // 使用时间戳 + 随机数确保唯一性
-  const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(2, 15);
-  return `${timestamp}-${random}`;
+	// 使用时间戳 + 随机数确保唯一性
+	const timestamp = Date.now()
+	const random = Math.random().toString(36).substring(2, 15)
+	return `${timestamp}-${random}`
 }
 
-export default { generateUploadId };
+export default { generateUploadId }

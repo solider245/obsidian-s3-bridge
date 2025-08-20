@@ -6,7 +6,7 @@
   - 粘贴图片后立即插入占位（blob 或本地临时文件），后台上传成功后替换为最终 URL，失败显示“重试”。[main.ts](main.ts:346) / [src/uploader/optimistic.ts](src/uploader/optimistic.ts:1)
   - 内存缓存 Map 记录 uploadId 对应的 base64/mime/文件名，点击“[重试](#)”复用缓存再次上传。[main.ts](main.ts:166)
 - 临时附件模式 + 一键清理
-  - 设置页新增开关、前缀与目录（默认 .assets + temp_upload_）、“扫描并清理”按钮；清理前二次确认并显示删除数量。[settingsTab.ts](settingsTab.ts:334)
+  - 设置页新增开关、前缀与目录（默认 .assets + temp*upload*）、“扫描并清理”按钮；清理前二次确认并显示删除数量。[settingsTab.ts](settingsTab.ts:334)
   - 临时文件创建改为走 Vault API（createBinary/modifyBinary → 回退 create/modify），保证被索引且可预览；删除优先 vault.delete，兜底 adapter.remove。[main.ts](main.ts:402)
 - 对象键生成策略（彻底解决覆盖）
   - 统一改为：keyPrefix + 日期前缀格式 + uploadId.ext；日期前缀格式通过“Object Key Prefix Format”自定义（默认 {yyyy}/{mm}）。[main.ts](main.ts:53)
@@ -26,7 +26,7 @@
 - 问题1：上传后所有对象被覆盖为固定名 image.png
   - 根因：对象键生成逻辑未确保唯一。
   - 修复：使用 uploadId 作为文件名，结合可配置日期前缀，形如 `blinko/2025/08/AB12CD34EF56GH78.png`。[main.ts](main.ts:53)
-- 问题2：临时附件模式下 Markdown 预览“找不到 .assets/temp_upload_*.png”
+- 问题2：临时附件模式下 Markdown 预览“找不到 .assets/temp*upload*\*.png”
   - 根因：直接使用 adapter.write/writeBinary 写盘未建立 Vault 索引，或路径解析为相对当前笔记导致歧义。
   - 修复：
     - 写入统一走 vault.createBinary/modifyBinary，回退 create/modify，保证被 Vault 索引。[main.ts](main.ts:402)
@@ -82,6 +82,7 @@
 ## 下一任务开场白（交接用）
 
 本次迭代已完成“乐观 UI 粘贴上传”“临时附件模式（含安全清理）”“对象键唯一命名（uploadId + 日期前缀）”等核心能力，并修复了“文件名覆盖导致最新替旧”和“临时文件预览找不到”的问题。当前主流程稳定、可在真实环境验证。建议从以下方向继续推进：
+
 - 编写关键路径自动化测试（对象键生成、失败重试、临时文件生命周期）
 - 完善 README 与动图示例，降低配置与上手成本
 - 评估上传取消/并发与图片压缩的用户需求优先级

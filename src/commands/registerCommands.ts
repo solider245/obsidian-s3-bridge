@@ -5,140 +5,141 @@
 //   registerCommands({ plugin, makeObjectKey, getExt, ensureWithinLimitOrConfirm, readClipboardImageAsBase64 });
 // 相关: [src/upload/performUpload.ts()](src/upload/performUpload.ts:1), [src/mime/extension.ts()](src/mime/extension.ts:1), [src/objectKey/makeKey.ts()](src/objectKey/makeKey.ts:1), [src/clipboard/readClipboard.ts()](src/clipboard/readClipboard.ts:1), [src/threshold/sizeGuard.ts()](src/threshold/sizeGuard.ts:1)
 
-import type { Editor, Plugin } from 'obsidian';
-import { Notice, MarkdownView } from 'obsidian';
-import { t, tp } from '../l10n';
-import { loadS3Config } from '../../s3/s3Manager';
-import { runCheck } from '../features/runCheck';
-import { performUpload } from '../upload/performUpload';
-import { makeObjectKey } from '../core/objectKey';
-import { generateUploadId } from '../utils/generateUploadId';
-import { getErrorMessage, getErrorType } from '../utils/errorHandling';
+import type { Editor, Plugin } from 'obsidian'
+import { Notice, MarkdownView } from 'obsidian'
+import { t, tp } from '../l10n'
+import { loadS3Config } from '../../s3/s3Manager'
+import { runCheck } from '../features/runCheck'
+import { performUpload } from '../upload/performUpload'
+import { makeObjectKey } from '../core/objectKey'
+import { generateUploadId } from '../utils/generateUploadId'
+import { getErrorMessage } from '../utils/errorHandling'
 
 export interface RegisterCtx {
-  plugin: Plugin;
-  getExt: (mime: string) => string;
-  ensureWithinLimitOrConfirm: (bytes: number, limitBytes?: number) => Promise<boolean>;
-  readClipboardImageAsBase64: () => Promise<{ base64: string; mime: string; size?: number } | null>;
+	plugin: Plugin
+	getExt: (mime: string) => string
+	ensureWithinLimitOrConfirm: (bytes: number, limitBytes?: number) => Promise<boolean>
+	readClipboardImageAsBase64: () => Promise<{ base64: string; mime: string; size?: number } | null>
 }
 
 export function registerCommands(ctx: RegisterCtx) {
-  const { plugin, getExt, ensureWithinLimitOrConfirm, readClipboardImageAsBase64 } = ctx;
+	const { plugin, getExt, ensureWithinLimitOrConfirm, readClipboardImageAsBase64 } = ctx
 
-  // 测试连接
-  plugin.addCommand({
-    id: 'obs3gemini-test-connection',
-    name: t('Check and Test Connection'),
-    callback: async () => {
-      await runCheck(plugin);
-    },
-  });
+	// 测试连接
+	plugin.addCommand({
+		id: 'obs3gemini-test-connection',
+		name: t('Check and Test Connection'),
+		callback: async () => {
+			await runCheck(plugin)
+		},
+	})
 
-  // 从本地选择文件上传
-  plugin.addCommand({
-    id: 'obs3gemini-upload-from-local-file',
-    name: t('Upload File from Local...'),
-    callback: async () => {
-      try {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.multiple = false;
-        input.accept = '';
-        const choice = await new Promise<File | null>((resolve) => {
-          input.onchange = () => {
-            const f = (input.files && input.files[0]) ? input.files[0] : null;
-            resolve(f);
-          };
-          input.click();
-        });
-        if (!choice) {
-          new Notice(t('Upload canceled by user'));
-          return;
-        }
+	// 从本地选择文件上传
+	plugin.addCommand({
+		id: 'obs3gemini-upload-from-local-file',
+		name: t('Upload File from Local...'),
+		callback: async () => {
+			try {
+				const input = document.createElement('input')
+				input.type = 'file'
+				input.multiple = false
+				input.accept = ''
+				const choice = await new Promise<File | null>(resolve => {
+					input.onchange = () => {
+						const f = input.files && input.files[0] ? input.files[0] : null
+						resolve(f)
+					}
+					input.click()
+				})
+				if (!choice) {
+					new Notice(t('Upload canceled by user'))
+					return
+				}
 
-        const maxMB = (window as any).__obS3_maxUploadMB__ ?? 5;
-        const limitBytes = Math.max(1, Number(maxMB)) * 1024 * 1024;
-        const ok = await ensureWithinLimitOrConfirm(choice.size, limitBytes);
-        if (!ok) {
-          new Notice(t('Upload canceled by user'));
-          return;
-        }
+				const maxMB = (window as any).__obS3_maxUploadMB__ ?? 5
+				const limitBytes = Math.max(1, Number(maxMB)) * 1024 * 1024
+				const ok = await ensureWithinLimitOrConfirm(choice.size, limitBytes)
+				if (!ok) {
+					new Notice(t('Upload canceled by user'))
+					return
+				}
 
-        const arrayBuffer = await choice.arrayBuffer();
-        const base64 = Buffer.from(arrayBuffer).toString('base64');
-        const mime = choice.type || 'application/octet-stream';
-        const ext = getExt(mime);
-        const cfgNow = await loadS3Config(plugin);
-        const keyPrefix = (cfgNow.keyPrefix || '').replace(/^\/+|\/+$/g, '');
-        const uploadId = generateUploadId();
-        const key = makeObjectKey(choice.name || 'clipboard-upload', ext, keyPrefix, uploadId);
+				const arrayBuffer = await choice.arrayBuffer()
+				const base64 = Buffer.from(arrayBuffer).toString('base64')
+				const mime = choice.type || 'application/octet-stream'
+				const ext = getExt(mime)
+				const cfgNow = await loadS3Config(plugin)
+				const keyPrefix = (cfgNow.keyPrefix || '').replace(/^\/+|\/+$/g, '')
+				const uploadId = generateUploadId()
+				const key = makeObjectKey(choice.name || 'clipboard-upload', ext, keyPrefix, uploadId)
 
-        const url = await performUpload(plugin, { key, mime, base64, fileName: choice.name });
+				const url = await performUpload(plugin, { key, mime, base64, fileName: choice.name })
 
-        const view = plugin.app.workspace.getActiveViewOfType(MarkdownView);
-        if (view) {
-          const editor: Editor = view.editor;
-          if (mime.startsWith('image/')) {
-            editor.replaceSelection(`![](${url})`);
-          } else {
-            const safeName = (choice.name || key.split('/').pop() || 'file').replace(/\]/g, '');
-            editor.replaceSelection(`[${safeName}](${url})`);
-          }
-        }
-      } catch (e: unknown) {
-        const errorMsg = getErrorMessage(e);
-        new Notice(tp('Upload failed: {error}', { error: errorMsg }));
-      }
-    },
-  });
+				const view = plugin.app.workspace.getActiveViewOfType(MarkdownView)
+				if (view) {
+					const editor: Editor = view.editor
+					if (mime.startsWith('image/')) {
+						editor.replaceSelection(`![](${url})`)
+					} else {
+						const safeName = (choice.name || key.split('/').pop() || 'file').replace(/\]/g, '')
+						editor.replaceSelection(`[${safeName}](${url})`)
+					}
+				}
+			} catch (e: unknown) {
+				const errorMsg = getErrorMessage(e)
+				new Notice(tp('Upload failed: {error}', { error: errorMsg }))
+			}
+		},
+	})
 
-  // 从剪贴板上传图片
-  plugin.addCommand({
-    id: 'obs3gemini-upload-from-clipboard',
-    name: 'Upload Image from Clipboard',
-    callback: async () => {
-      try {
-        const clip = await readClipboardImageAsBase64();
-        if (!clip) {
-          new Notice(tp('Upload failed: {error}', { error: 'No image in clipboard' }));
-          return;
-        }
+	// 从剪贴板上传图片
+	plugin.addCommand({
+		id: 'obs3gemini-upload-from-clipboard',
+		name: 'Upload Image from Clipboard',
+		callback: async () => {
+			try {
+				const clip = await readClipboardImageAsBase64()
+				if (!clip) {
+					new Notice(tp('Upload failed: {error}', { error: 'No image in clipboard' }))
+					return
+				}
 
-        const maxMB = (window as any).__obS3_maxUploadMB__ ?? 5;
-        const limitBytes = Math.max(1, Number(maxMB)) * 1024 * 1024;
+				const maxMB = (window as any).__obS3_maxUploadMB__ ?? 5
+				const limitBytes = Math.max(1, Number(maxMB)) * 1024 * 1024
 
-        const approxBytes = typeof clip.size === 'number' ? clip.size : Math.floor((clip.base64.length * 3) / 4);
-        const ok = await ensureWithinLimitOrConfirm(approxBytes, limitBytes);
-        if (!ok) {
-          new Notice(t('Upload canceled by user'));
-          return;
-        }
+				const approxBytes =
+					typeof clip.size === 'number' ? clip.size : Math.floor((clip.base64.length * 3) / 4)
+				const ok = await ensureWithinLimitOrConfirm(approxBytes, limitBytes)
+				if (!ok) {
+					new Notice(t('Upload canceled by user'))
+					return
+				}
 
-        const ext = getExt(clip.mime);
-        const cfgNow = await loadS3Config(plugin);
-        const keyPrefix = (cfgNow.keyPrefix || '').replace(/^\/+|\/+$/g, '');
-        const uploadId = generateUploadId();
-        const key = makeObjectKey('clipboard-upload', ext, keyPrefix, uploadId);
+				const ext = getExt(clip.mime)
+				const cfgNow = await loadS3Config(plugin)
+				const keyPrefix = (cfgNow.keyPrefix || '').replace(/^\/+|\/+$/g, '')
+				const uploadId = generateUploadId()
+				const key = makeObjectKey('clipboard-upload', ext, keyPrefix, uploadId)
 
-        const url = await performUpload(plugin, { 
-          key, 
-          mime: clip.mime || 'application/octet-stream', 
-          base64: clip.base64,
-          fileName: 'clipboard-image'
-        });
+				const url = await performUpload(plugin, {
+					key,
+					mime: clip.mime || 'application/octet-stream',
+					base64: clip.base64,
+					fileName: 'clipboard-image',
+				})
 
-        const md = `![](${url})`;
-        const view = plugin.app.workspace.getActiveViewOfType(MarkdownView);
-        if (view) {
-          const editor: Editor = view.editor;
-          editor.replaceSelection(md);
-        }
-      } catch (e: unknown) {
-        const errorMsg = getErrorMessage(e);
-        new Notice(tp('Upload failed: {error}', { error: errorMsg }));
-      }
-    },
-  });
+				const md = `![](${url})`
+				const view = plugin.app.workspace.getActiveViewOfType(MarkdownView)
+				if (view) {
+					const editor: Editor = view.editor
+					editor.replaceSelection(md)
+				}
+			} catch (e: unknown) {
+				const errorMsg = getErrorMessage(e)
+				new Notice(tp('Upload failed: {error}', { error: errorMsg }))
+			}
+		},
+	})
 }
- 
-export default { registerCommands };
+
+export default { registerCommands }

@@ -33,6 +33,7 @@ flowchart TD
 ```
 
 核心组件与职责：
+
 - 入口与粘贴链路：[`main.ts`](main.ts:1)
 - 乐观 UI 占位/重试：[`src/uploader/optimistic.ts`](src/uploader/optimistic.ts:1)
 - 预签名与上传：[`src/uploader/presignPut.ts`](src/uploader/presignPut.ts:1)
@@ -53,20 +54,24 @@ flowchart TD
 
 ## 3. 使用与行为
 
-1) 粘贴图片
+1. 粘贴图片
+
 - 小于阈值：直接进入乐观 UI，插入占位（blob 或临时文件路径），后台上传成功替换为最终链接。
 - 超出阈值：弹二次确认，取消则终止。
   - 相关逻辑：[粘贴链路](main.ts:350), [阈值计算](main.ts:365)
 
-2) 本地文件上传命令
+2. 本地文件上传命令
+
 - 图片插入 `![]()`；非图片插入 `[filename]()`。
   - 命令入口：[本地文件上传](main.ts:220)
 
-3) 剪贴板上传命令
+3. 剪贴板上传命令
+
 - 仅图片类型，成功后插入 `![]()`。
   - 命令入口：[剪贴板上传](main.ts:292)
 
-4) 失败与重试
+4. 失败与重试
+
 - 失败占位格式：`![上传失败 ob-s3:id=XXXX status=failed](#) [重试](#)`。
 - 点击重试：文本层拦截，复用内存缓存再次发起上传。
   - 重试接线：[安装拦截](main.ts:166), [事件处理](src/uploader/optimistic.ts:183)
@@ -82,9 +87,11 @@ flowchart TD
 ## 5. 配置与运行期参数
 
 Profile 配置（示例）：[`config/s3Config.example.json`](config/s3Config.example.json:1)
+
 - endpoint、accessKeyId、secretAccessKey、bucketName、region、useSSL、baseUrl、keyPrefix
 
 运行期参数注入与读取：
+
 - 最大上传大小 MB：`window.__obS3_maxUploadMB__`
   - 写入于设置页，读取于 [main.ts:243, main.ts:308, main.ts:366](main.ts:241)
 - 对象键日期格式：`window.__obS3_keyPrefixFormat__`
@@ -95,6 +102,7 @@ Profile 配置（示例）：[`config/s3Config.example.json`](config/s3Config.ex
   - 使用于 [`optimistic.ts` ring buffer](src/uploader/optimistic.ts:26)
 
 透传表（示例）：
+
 - 阈值与确认：[main.ts:361-379](main.ts:361)
 - 日期前缀格式：[main.ts:185,267,329,486](main.ts:182)
 - 超时参数：[main.ts:190-191, 333-335, 492-494](main.ts:186)
@@ -102,20 +110,25 @@ Profile 配置（示例）：[`config/s3Config.example.json`](config/s3Config.ex
 ## 6. 错误处理与排障
 
 常见问题：
-1) Cloudflare R2 可达但访问 URL 404
+
+1. Cloudflare R2 可达但访问 URL 404
+
 - 需在 Profile 配置 `baseUrl`（如 `https://<bucket>.r2.dev` 或自定义域）。
 - 参考公开 URL 构造规则：[s3/s3Manager.ts](s3/s3Manager.ts:269)
 
-2) “找不到临时文件”
+2. “找不到临时文件”
+
 - 已修复：临时文件写入统一走 Vault API，被索引可预览；删除优先 `vault.delete`，兜底 `adapter.remove`。
 - 若目录被用户手动删除，也能通过 “mkdir -p” 野蛮创建保证可用。
   - 参考：[main.ts 写入/删除与 mkdir](main.ts:402)
 
-3) 上传对象被覆盖
+3. 上传对象被覆盖
+
 - 统一使用 `uploadId` 唯一命名 + 可配置日期前缀，已彻底规避。
   - 参考：[makeObjectKey](main.ts:58)
 
 网络/权限类错误分类与提示：
+
 - 连接、DNS/TLS/超时、鉴权、NoSuchBucket 等诊断说明可参考备用直传实现：
   - [`src/uploader/s3Uploader.ts`](src/uploader/s3Uploader.ts:43)
 
@@ -129,12 +142,14 @@ Profile 配置（示例）：[`config/s3Config.example.json`](config/s3Config.ex
 ## 8. 测试建议
 
 优先覆盖以下路径：
+
 - makeObjectKey：不同前缀与日期格式、非法字符清洗、uploadId 覆盖策略。
 - 占位协议与替换：uploading/failed 两类占位的查找与替换。
 - 临时文件生命周期：写入 → 预览占位 → 上传成功删除/失败保留。
 - buildPublicUrl：不同 provider/R2 场景下的 URL 生成分支。
 
 参考目录：
+
 - 单测样例：[`tests/unit`](tests/unit/)
 - stubs/mocks：[`tests/stubs`](tests/stubs/), [`tests/mocks`](tests/mocks/)
 

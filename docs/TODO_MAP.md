@@ -3,6 +3,7 @@
 用于把作战清单的每一步落到具体文件与函数，便于新同学快速定位与回归时核对。
 
 ## 1. 粘贴阶段（本地写入与占位、同名后缀重试、资源路径转换）
+
 - 入口与安装：
   - [src/paste/installPasteHandler.ts.installPasteHandler()](src/paste/installPasteHandler.ts:1)
 - 核心职责：
@@ -16,6 +17,7 @@
     - 非临时模式：可转换为 app:// 资源 URL 仅用于预览显示（不用于队列 path）
 
 ## 2. 入队与持久化
+
 - 队列模型与存取：
   - [src/types/index.ts.QueueItem](src/types/index.ts:1)
   - [src/commands/registerCommands.ts.loadQueue() / saveQueue()](src/commands/registerCommands.ts:1)
@@ -24,6 +26,7 @@
   - id 唯一并可用于兜底对象键
 
 ## 3. 手动处理（单条）
+
 - 统一处理函数：
   - [src/queue/processNext.ts.processNext()](src/queue/processNext.ts:1)
 - 逻辑要点：
@@ -36,6 +39,7 @@
   - [src/commands/registerCommands.ts.registerCommands() → obs3gemini-queue-process-next](src/commands/registerCommands.ts:1)
 
 ## 4. 调度器（最小实现，不自动启动）
+
 - 工厂与实例：
   - [src/scheduler/queueScheduler.ts.createQueueScheduler()](src/scheduler/queueScheduler.ts:1)
 - 运行规则：
@@ -45,6 +49,7 @@
   - [src/commands/registerCommands.ts.registerCommands() → Scheduler: Start/Stop/Status](src/commands/registerCommands.ts:1)
 
 ## 5. 占位协议与重试入口（规划）
+
 - 工具方法：
   - [src/uploader/optimistic.ts.buildUploadingMarkdown()](src/uploader/optimistic.ts:1)
   - [src/uploader/optimistic.ts.buildFailedMarkdown()](src/uploader/optimistic.ts:1)
@@ -54,6 +59,7 @@
   - [src/features/installRetryHandler.ts.installRetryHandler()](src/features/installRetryHandler.ts:1)
 
 ## 6. 生命周期（入口/清理）
+
 - 插件入口：
   - [src/index.ts.onload() / src/index.ts.onunload()](src/index.ts:1)
 - 要点：
@@ -61,6 +67,7 @@
   - onunload：若调度器存在且 running → stop（清 interval）；清理模块级句柄
 
 ## 7. 配置与上传
+
 - S3 相关：
   - [src/uploader/presignPut.ts.presignPut()](src/uploader/presignPut.ts:1)
   - [src/uploader/s3Uploader.ts](src/uploader/s3Uploader.ts:1)
@@ -69,6 +76,7 @@
   - [src/core/objectKey.ts.makeObjectKey()](src/core/objectKey.ts:1)
 
 ## 8. 验证与回归（参考文档）
+
 - 压力测试：
   - [docs/TESTING_STRESS.md](docs/TESTING_STRESS.md:1)
 - 监听审计：

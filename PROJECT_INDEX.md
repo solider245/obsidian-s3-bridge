@@ -5,6 +5,7 @@
 提示：所有链接都可点击跳转到对应文件或代码位置。
 
 ## 0. 快速导览（做什么去哪里改）
+
 - 粘贴上传链路（含乐观 UI）：[main.ts:346](main.ts:346)
 - 乐观 UI 协议与重试缓存：[`src/uploader/optimistic.ts`](src/uploader/optimistic.ts:1)
 - 预签名上传（主进程、HTTPS PUT）：[`src/uploader/presignPut.ts`](src/uploader/presignPut.ts:1)
@@ -14,6 +15,7 @@
 - 单一入口索引（引子）：[`src/index.ts`](src/index.ts:1)
 
 ## 1. 现有目录与角色（分层聚合）
+
 - 入口与主流程
   - [`main.ts`](main.ts:1) 插件入口、命令注册接线、editor-paste 监听、乐观UI粘贴、对象键策略、失败重试接线
 - 分层结构
@@ -33,23 +35,26 @@
   - 本索引 [`PROJECT_INDEX.md`](PROJECT_INDEX.md:1)
 
 ## 2. 关键链路一图流
+
 flowchart TD
-    A[editor-paste 监听 main.ts:346] --> B[构造占位 optimistic.buildUploadingMarkdown]
-    B --> C[缓存 base64/mime uploadId]
-    C --> D[异步上传 presignAndPutObject]
-    D --> E[成功: 替换为 publicUrl]
-    D --> F[失败: 替换为失败占位 + 可重试]
-    F --> G[点击重试 features.installRetryHandler]
-    G --> D
-    E --> H[释放 blob 或删除临时附件]
-    subgraph 设置页
-      S1[最大上传大小 __obS3_maxUploadMB__]
-      S2[对象键日期前缀 __obS3_keyPrefixFormat__]
-      S3[临时附件模式 开关/前缀/目录 + 清理按钮]
-    end
+A[editor-paste 监听 main.ts:346] --> B[构造占位 optimistic.buildUploadingMarkdown]
+B --> C[缓存 base64/mime uploadId]
+C --> D[异步上传 presignAndPutObject]
+D --> E[成功: 替换为 publicUrl]
+D --> F[失败: 替换为失败占位 + 可重试]
+F --> G[点击重试 features.installRetryHandler]
+G --> D
+E --> H[释放 blob 或删除临时附件]
+subgraph 设置页
+S1[最大上传大小 __obS3_maxUploadMB__]
+S2[对象键日期前缀 __obS3_keyPrefixFormat__]
+S3[临时附件模式 开关/前缀/目录 + 清理按钮]
+end
 
 ## 3. 修改指引（增删查改）
+
 A. 增加功能
+
 - 新的对象键规则或日期占位：
   - 使用 [`src/core/objectKey.ts.makeObjectKey()`](src/core/objectKey.ts:1)
   - 如需更复杂格式，配合设置项在 [`settingsTab.ts`](settingsTab.ts:265) 读取并写入 `window.__obS3_keyPrefixFormat__`
@@ -59,18 +64,21 @@ A. 增加功能
   - 在 [`main.ts`](main.ts:205) 添加命令，复用 [`presignAndPutObject()`](src/uploader/presignPut.ts:174)
 
 B. 删除或清理
+
 - 移除历史遗留逻辑时，确保不破坏以下调用点：
   - 粘贴路径：[`main.ts:346`](main.ts:346)
   - 重试接线：[`main.ts:166`](main.ts:166) 与 [`src/uploader/optimistic.ts`](src/uploader/optimistic.ts:136)
   - 公共链接生成：[`s3/s3Manager.ts:269`](s3/s3Manager.ts:269)
 
 C. 查询排障
+
 - 公共 URL 规则与分支：[`s3/s3Manager.ts:269`](s3/s3Manager.ts:269)
 - 预签名与 PUT 细节：[`src/uploader/presignPut.ts`](src/uploader/presignPut.ts:1)
 - 占位正则与替换：[`src/uploader/optimistic.ts`](src/uploader/optimistic.ts:28)
 - 设置项如何透传到运行期：[`settingsTab.ts:195`](settingsTab.ts:195), [`settingsTab.ts:265`](settingsTab.ts:265)
 
 ## 4. 文件到能力的反向索引（更新后）
+
 - MIME → 扩展名：[`src/core/mime.ts.getFileExtensionFromMime`](src/core/mime.ts:1)
 - 对象键生成：[`src/core/objectKey.ts.makeObjectKey`](src/core/objectKey.ts:1)
 - 剪贴板读取：[`src/core/readClipboard.ts.readClipboardImageAsBase64`](src/core/readClipboard.ts:1)
@@ -78,12 +86,14 @@ C. 查询排障
 - 预签名上传与公开 URL：[`src/uploader/presignPut.ts`](src/uploader/presignPut.ts:1) + [`s3/s3Manager.ts`](s3/s3Manager.ts:1)
 
 ## 5. 单一入口索引用法
+
 - 推荐所有上层装配只从 [`src/index.ts`](src/index.ts:1) 导入需要的 API：
   - 例如：`import { makeObjectKey, getFileExtensionFromMime, installRetryHandler } from './src/index';`
 - 迁移注意：
   - commands 与 paste 模块仍在原路径，main 暂以 require 调用；后续迁移到 features 后，将在 index 统一导出并更新 main 的导入。
 
 ## 6. 常见问题与排查
+
 - Cloudflare R2 无法生成可访问链接
   - 必须在 Profile 配置 `baseUrl`，例如 `https://<bucket>.r2.dev` 或自定义域
   - 代码参考：[`s3/s3Manager.ts:285`](s3/s3Manager.ts:285)
@@ -93,6 +103,7 @@ C. 查询排障
   - 使用 uploadId 作为唯一名 + 日期前缀；参考 [`src/core/objectKey.ts`](src/core/objectKey.ts:1)
 
 ## 7. 变更记录（本次重构相关）
+
 - 引入分层结构：`src/core`, `src/features` 与单一入口 [`src/index.ts`](src/index.ts:1)
 - 文件迁移与命名简化：
   - `src/mime/extension.ts` → [`src/core/mime.ts`](src/core/mime.ts:1)

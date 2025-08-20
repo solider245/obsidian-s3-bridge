@@ -4,20 +4,20 @@
 
 // ---- core 层导出 ----
 // i18nBootstrap（保持原路径，待后续收敛到 core/bootstrap 视需要迁移）
-export * from './bootstrap/i18nBootstrap';
+export * from './bootstrap/i18nBootstrap'
 
 // MIME 推断
-export { getFileExtensionFromMime } from './core/mime';
+export { getFileExtensionFromMime } from './core/mime'
 
 // 对象键生成
-export { makeObjectKey } from './core/objectKey';
+export { makeObjectKey } from './core/objectKey'
 
 // 剪贴板读取
-export { readClipboardImageAsBase64 } from './core/readClipboard';
+export { readClipboardImageAsBase64 } from './core/readClipboard'
 
 // 上传基元与组合
-export * from './uploader/presignPut'; // 保持现有相对路径，不做移动以降低风险
-export * as presignPut from './uploader/presignPut';
+export * from './uploader/presignPut' // 保持现有相对路径，不做移动以降低风险
+export * as presignPut from './uploader/presignPut'
 
 // 其余 core 工具（占位、阈值、实际上传、等）暂保持原位，后续补充到本索引
 // export { ensureWithinLimitOrConfirm } from './core/sizeGuard';

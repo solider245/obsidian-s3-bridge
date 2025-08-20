@@ -5,19 +5,19 @@
 //   await registerBuiltinPacksAndLoad(this);
 // 相关: [main.ts()](main.ts:1)
 
-import type { Plugin } from 'obsidian';
-import { loadTranslations, registerBuiltinLang } from '../l10n';
+import type { Plugin } from 'obsidian'
+import { loadTranslations, registerBuiltinLang } from '../l10n'
 
 // 采用 require 避免 TS 对 json import 的报错；运行时若未打包则静默回退英文
 function safeLoadZhCN(): any {
-  let pack: any = {};
-  try {
-    // @ts-ignore
-    pack = require('../lang/zh-CN.json');
-  } catch {
-    // ignore if zh-CN not bundled
-  }
-  return pack;
+	let pack: any = {}
+	try {
+		// @ts-ignore
+		pack = require('../lang/zh-CN.json')
+	} catch {
+		// ignore if zh-CN not bundled
+	}
+	return pack
 }
 
 /**
@@ -26,10 +26,10 @@ function safeLoadZhCN(): any {
  * - 允许后续通过 settingsTab 的 custom-lang.json 覆盖
  */
 export async function registerBuiltinPacksAndLoad(plugin: Plugin): Promise<void> {
-  const zh = safeLoadZhCN();
-  registerBuiltinLang('zh-cn', zh);
-  registerBuiltinLang('zh-CN', zh);
-  await loadTranslations(plugin);
+	const zh = safeLoadZhCN()
+	registerBuiltinLang('zh-cn', zh)
+	registerBuiltinLang('zh-CN', zh)
+	await loadTranslations(plugin)
 }
 
-export default { registerBuiltinPacksAndLoad };
+export default { registerBuiltinPacksAndLoad }

@@ -1,9 +1,9 @@
 {
-  "endpoint": "",
-  "accessKeyId": "",
-  "secretAccessKey": "",
-  "bucketName": "",
-  "region": "",
-  "useSSL": true,
-  "keyPrefix": ""
+	"endpoint": "",
+	"accessKeyId": "",
+	"secretAccessKey": "",
+	"bucketName": "",
+	"region": "",
+	"useSSL": true,
+	"keyPrefix": ""
 }
