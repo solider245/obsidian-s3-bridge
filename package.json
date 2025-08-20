@@ -16,7 +16,8 @@
 		"format": "prettier --write .",
 		"format:check": "prettier --check .",
 		"format:lint": "npm run format && npm run lint:fix",
-		"ci": "npm run format:check && npm run lint && npm run test && npm run build"
+		"security-check": "node scripts/security-check.js",
+		"ci": "npm run format:check && npm run lint && npm run test && npm run security-check && npm run build"
 	},
 	"keywords": [
 		"obsidian",
@@ -40,6 +41,7 @@
 		"esbuild": "0.17.3",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-prettier": "^5.5.4",
+		"glob": "^10.3.10",
 		"jest": "^30.0.5",
 		"obsidian": "latest",
 		"prettier": "^3.6.2",
