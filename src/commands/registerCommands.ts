@@ -12,6 +12,7 @@ import { loadS3Config } from '../../s3/s3Manager';
 import { runCheck } from '../features/runCheck';
 import { performUpload } from '../upload/performUpload';
 import { makeObjectKey } from '../core/objectKey';
+import { generateUploadId } from '../utils/generateUploadId';
 
 export interface RegisterCtx {
   plugin: Plugin;
@@ -68,7 +69,8 @@ export function registerCommands(ctx: RegisterCtx) {
         const ext = getExt(mime);
         const cfgNow = await loadS3Config(plugin);
         const keyPrefix = (cfgNow.keyPrefix || '').replace(/^\/+|\/+$/g, '');
-        const key = makeObjectKey(choice.name || 'clipboard-upload', ext, keyPrefix);
+        const uploadId = generateUploadId();
+        const key = makeObjectKey(choice.name || 'clipboard-upload', ext, keyPrefix, uploadId);
 
         const url = await performUpload(plugin, { key, mime, base64 });
 
@@ -113,7 +115,8 @@ export function registerCommands(ctx: RegisterCtx) {
         const ext = getExt(clip.mime);
         const cfgNow = await loadS3Config(plugin);
         const keyPrefix = (cfgNow.keyPrefix || '').replace(/^\/+|\/+$/g, '');
-        const key = makeObjectKey('clipboard-upload', ext, keyPrefix);
+        const uploadId = generateUploadId();
+        const key = makeObjectKey('clipboard-upload', ext, keyPrefix, uploadId);
 
         const url = await performUpload(plugin, { key, mime: clip.mime || 'application/octet-stream', base64: clip.base64 });
 

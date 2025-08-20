@@ -6,6 +6,7 @@ import { t, tp } from '../l10n';
 import { makeObjectKey } from '../core/objectKey';
 import { buildPublicUrl, loadS3Config } from '../../s3/s3Manager';
 import { activityLog } from '../activityLog';
+import { generateUploadId } from '../utils/generateUploadId';
 
 export interface PasteCtx {
   plugin: Plugin;
@@ -41,7 +42,8 @@ export function installPasteHandler(ctx: PasteCtx): void {
         const ext = getExt(mime);
 
         const config = loadS3Config(plugin);
-        const key = makeObjectKey(file.name, ext, config.keyPrefix || '');
+        const uploadId = generateUploadId();
+        const key = makeObjectKey(file.name, ext, config.keyPrefix || '', uploadId);
 
         let finalUrl = '';
         const startTime = Date.now();
