@@ -8,11 +8,10 @@ import { BatchUploader, UploadItem, BatchProgress } from '../upload/BatchUploade
 import { configManager } from '../config/ConfigurationManager'
 import { enhancedProgressManager, EnhancedProgressUpdate } from '../utils/enhancedProgress'
 import { smartNotificationManager } from '../utils/smartNotifications'
-import { Notice } from 'obsidian'
+import { Notice, Modal, App } from 'obsidian'
 
 export class BatchUploadModal extends Modal {
   private uploader: BatchUploader
-  private contentEl: HTMLElement
   private progressEl: HTMLElement
   private itemsListEl: HTMLElement
   private controlsEl: HTMLElement
@@ -40,7 +39,6 @@ export class BatchUploadModal extends Modal {
 
   onOpen() {
     const { contentEl } = this
-    this.contentEl = contentEl
 
     contentEl.createEl('h2', { text: '批量上传文件' })
 
@@ -84,8 +82,10 @@ export class BatchUploadModal extends Modal {
     
     // 文件选择按钮
     const fileInput = selectionArea.createEl('input', {
-      type: 'file',
-      multiple: true,
+      attr: {
+        type: 'file',
+        multiple: 'multiple'
+      },
       cls: 'batch-upload-file-input'
     })
     
@@ -129,13 +129,13 @@ export class BatchUploadModal extends Modal {
     
     // 进度信息
     const progressInfo = this.progressEl.createDiv({ cls: 'batch-upload-progress-info' })
-    const progressText = progressInfo.createDiv({ cls: 'batch-upload-progress-text' })
-    const speedText = progressInfo.createDiv({ cls: 'batch-upload-speed-text' })
+    const progressTextEl = progressInfo.createDiv({ cls: 'batch-upload-progress-text' })
+    const speedTextEl = progressInfo.createDiv({ cls: 'batch-upload-speed-text' })
     
     // 保存引用
     (progressBar as any).fillEl = progressFill
-    (progressInfo as any).textEl = progressText
-    (progressInfo as any).speedEl = speedText
+    (progressInfo as any).textEl = progressTextEl
+    (progressInfo as any).speedEl = speedTextEl
   }
 
   /**
@@ -207,10 +207,11 @@ export class BatchUploadModal extends Modal {
     })
 
     // 保存按钮引用
-    (this.controlsEl as any).startButton = startButton
-    (this.controlsEl as any).pauseButton = pauseButton
-    (this.controlsEl as any).stopButton = stopButton
-    (this.controlsEl as any).retryButton = retryButton
+    const controls = this.controlsEl as any
+    controls.startButton = startButton
+    controls.pauseButton = pauseButton
+    controls.stopButton = stopButton
+    controls.retryButton = retryButton
   }
 
   /**
@@ -260,17 +261,17 @@ export class BatchUploadModal extends Modal {
   private setupDragDrop(): void {
     const modalEl = this.modalEl
     
-    modalEl.addEventListener('dragover', (e) => {
+    modalEl.addEventListener('dragover', (e: DragEvent) => {
       e.preventDefault()
       modalEl.addClass('batch-upload-drag-over')
     })
 
-    modalEl.addEventListener('dragleave', (e) => {
+    modalEl.addEventListener('dragleave', (e: DragEvent) => {
       e.preventDefault()
       modalEl.removeClass('batch-upload-drag-over')
     })
 
-    modalEl.addEventListener('drop', (e) => {
+    modalEl.addEventListener('drop', (e: DragEvent) => {
       e.preventDefault()
       modalEl.removeClass('batch-upload-drag-over')
       
@@ -699,23 +700,4 @@ export class BatchUploadModal extends Modal {
     }
   }
 
-  /**
-   * 格式化速度
-   */
-  private formatSpeed(bytesPerSecond: number): string {
-    if (bytesPerSecond === 0) return '0 B/s'
-    const k = 1024
-    const sizes = ['B', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytesPerSecond) / Math.log(k))
-    return parseFloat((bytesPerSecond / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i] + '/s'
   }
-
-  /**
-   * 格式化时间
-   */
-  private formatTime(seconds: number): string {
-    if (seconds < 60) return `${Math.round(seconds)}秒`
-    if (seconds < 3600) return `${Math.round(seconds / 60)}分钟`
-    return `${Math.round(seconds / 3600)}小时`
-  }
-}

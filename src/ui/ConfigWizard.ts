@@ -7,7 +7,7 @@
 import { configManager } from '../config/ConfigurationManager'
 import { validateUrl, validateAccessKey, validateSecretKey, validateBucketName, validateRegion } from '../config/validation'
 import { errorHandler, withErrorHandling } from '../error/ErrorHandler'
-import { Notice, Modal, Setting } from 'obsidian'
+import { Notice, Modal, Setting, App } from 'obsidian'
 
 export interface ConfigTemplate {
   id: string
@@ -54,7 +54,7 @@ export class ConfigWizardModal extends Modal {
   private currentStep = 0
   private wizardData: any = {}
   private steps: WizardStep[] = []
-  private contentEl: HTMLElement
+  private wizardContentEl: HTMLElement
   private navigationEl: HTMLElement
   private stepContentEl: HTMLElement
   private progressEl: HTMLElement
@@ -77,7 +77,7 @@ export class ConfigWizardModal extends Modal {
 
   onOpen() {
     const { contentEl } = this
-    this.contentEl = contentEl
+    this.wizardContentEl = contentEl
 
     this.render()
   }
@@ -151,25 +151,25 @@ export class ConfigWizardModal extends Modal {
    * 渲染向导
    */
   private render(): void {
-    this.contentEl.empty()
-    this.contentEl.addClass('s3-bridge-config-wizard')
+    this.wizardContentEl.empty()
+    this.wizardContentEl.addClass('s3-bridge-config-wizard')
 
     // 标题
-    const titleEl = this.contentEl.createEl('h2', { 
+    const titleEl = this.wizardContentEl.createEl('h2', { 
       text: 'S3-Bridge 配置向导',
       cls: 's3-bridge-wizard-title'
     })
 
     // 进度条
-    this.progressEl = this.contentEl.createDiv({ cls: 's3-bridge-wizard-progress' })
+    this.progressEl = this.wizardContentEl.createDiv({ cls: 's3-bridge-wizard-progress' })
     this.renderProgress()
 
     // 步骤内容
-    this.stepContentEl = this.contentEl.createDiv({ cls: 's3-bridge-wizard-step-content' })
+    this.stepContentEl = this.wizardContentEl.createDiv({ cls: 's3-bridge-wizard-step-content' })
     this.renderStepContent()
 
     // 导航按钮
-    this.navigationEl = this.contentEl.createDiv({ cls: 's3-bridge-wizard-navigation' })
+    this.navigationEl = this.wizardContentEl.createDiv({ cls: 's3-bridge-wizard-navigation' })
     this.renderNavigation()
   }
 

@@ -27,6 +27,7 @@ export interface ErrorContext {
   timestamp?: number
   userId?: string
   additionalData?: Record<string, any>
+  attempt?: number
 }
 
 export interface UserFriendlyError {
@@ -407,3 +408,6 @@ export async function retryOperation<T>(
 ): Promise<T> {
   return errorHandler.retry(operation, context, maxRetries, delayMs)
 }
+
+// 从decorators.ts重新导出
+export { withErrorHandling, withErrorHandlingAsync, withErrorHandlingSync } from './decorators'

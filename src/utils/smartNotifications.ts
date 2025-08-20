@@ -221,7 +221,7 @@ export class SmartNotificationManager {
   /**
    * 显示通知
    */
-  private showNotification(message: NotificationMessage): void {
+  public showNotification(message: NotificationMessage): void {
     // 检查是否超过最大并发通知数
     if (this.activeNotifications.size >= message.config.maxConcurrent) {
       this.dismissOldestNotification()

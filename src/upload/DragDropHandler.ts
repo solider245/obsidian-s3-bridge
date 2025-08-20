@@ -8,7 +8,7 @@ import { configManager } from '../config/ConfigurationManager'
 import { errorHandler, withErrorHandling } from '../error/ErrorHandler'
 import { getGlobalBatchUploader } from '../upload/BatchUploader'
 import { enhancedProgressManager } from '../utils/enhancedProgress'
-import { Notice } from 'obsidian'
+import { Notice, Editor } from 'obsidian'
 
 export interface DragDropOptions {
   /** 是否启用拖拽上传 */
