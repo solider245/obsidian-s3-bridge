@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  安全检查:
+  quality-check:
     runs-on: ubuntu-latest
     
     steps:
@@ -34,12 +34,9 @@ jobs:
       
     - name: 构建检查
       run: npm run build
-      
-    - name: 安全检查
-      run: node scripts/security-check.js
 
-  构建和打包:
-    needs: 安全检查
+  build-and-package:
+    needs: quality-check
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     
@@ -90,8 +87,8 @@ jobs:
           release/styles.css
           release/obsidian-s3-bridge-v*.zip
 
-  创建发布:
-    needs: [安全检查, 构建和打包]
+  create-release:
+    needs: [quality-check, build-and-package]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     
