@@ -108,8 +108,8 @@ export function renderTempAttachSettings(app: App, containerEl: HTMLElement) {
           } else {
             new Notice(t('Operation canceled'));
           }
-        } catch (e: any) {
-          new Notice(tp('Cleanup failed: {error}', { error: e?.message ?? String(e) }));
+        } catch (e: unknown) {
+          new Notice(tp('Cleanup failed: {error}', { error: e instanceof Error ? e.message : String(e) }));
         }
       });
     });

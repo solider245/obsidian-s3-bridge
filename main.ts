@@ -13,19 +13,24 @@
 import { Notice, Plugin } from 'obsidian';
 import { t, tp } from './src/l10n';
 import { MyPluginSettingTab, DEFAULT_SETTINGS } from './settingsTab';
+import { registerCommands } from './src/commands/registerCommands';
+import { installPasteHandler } from './src/paste/installPasteHandler';
+import { getFileExtensionFromMime } from './src/core/mime';
+import { readClipboardImageAsBase64 } from './src/core/readClipboard';
+import { ensureWithinLimitOrConfirm } from './src/threshold/sizeGuard';
+import { initUploadNotifications, cleanupUploadNotifications } from './src/utils/uploadNotifications';
 
 // 统一从单一索引导入（分层聚合）
 import {
   registerBuiltinPacksAndLoad,
 } from './src/index';
 
-// 暂时仍直接从原路径显式导入，待后续迁移至 features 并由 index 再导出
-import { registerCommands } from './src/commands/registerCommands';
-import { installPasteHandler } from './src/paste/installPasteHandler';
-
 export default class S3BridgePlugin extends Plugin {
   async onload() {
     await registerBuiltinPacksAndLoad(this);
+
+    // 初始化上传通知系统
+    initUploadNotifications(this);
 
     this.addSettingTab(new MyPluginSettingTab(this.app, this));
 
@@ -40,8 +45,8 @@ export default class S3BridgePlugin extends Plugin {
             this.app.setting.openTabById(this.manifest.id);
           }
           new Notice(t('Opening settings...'));
-        } catch (e: any) {
-          new Notice(tp('Operation failed: {error}', { error: e?.message ?? String(e) }));
+        } catch (e: unknown) {
+          new Notice(tp('Operation failed: {error}', { error: e instanceof Error ? e.message : String(e) }));
         }
       });
       ribbon?.setAttr('aria-label', t('S3 Bridge'));
@@ -50,22 +55,24 @@ export default class S3BridgePlugin extends Plugin {
     }
 
     // 注册命令与粘贴处理（装配注入在其模块内部完成）
-    // TODO: 待 registerCommands 收敛到 features 后改为从 ./src/index 导入
-    (require('./src/commands/registerCommands') as any).registerCommands({
+    registerCommands({
       plugin: this,
-      // 其余依赖在模块内动态导入，主入口不再直接关心实现细节
-      getExt: (mime: string) => (require('./src/core/mime') as any).getFileExtensionFromMime(mime),
-      readClipboardImageAsBase64: () => (require('./src/core/readClipboard') as any).readClipboardImageAsBase64(),
+      getExt: getFileExtensionFromMime,
+      readClipboardImageAsBase64: readClipboardImageAsBase64,
+      ensureWithinLimitOrConfirm: ensureWithinLimitOrConfirm,
     });
 
-    (require('./src/paste/installPasteHandler') as any).installPasteHandler({
+    installPasteHandler({
       plugin: this,
-      getExt: (mime: string) => (require('./src/core/mime') as any).getFileExtensionFromMime(mime),
+      getExt: getFileExtensionFromMime,
     });
   }
  
   async onunload() {
     try {
+      // 清理上传通知系统
+      cleanupUploadNotifications();
+      
       // 仅记录生命周期事件，便于压力测试观察是否存在多次卸载或未清理的幽灵监听
       // 使用结构化日志，后续如发现非托管资源，可在此处补充显式卸载
     console.info('[obsidian-s3-bridge][lifecycle] onunload invoked');

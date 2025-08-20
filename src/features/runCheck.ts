@@ -1,6 +1,7 @@
 import { Notice, Plugin } from 'obsidian';
 import { loadActiveProfile, S3Profile } from '../../s3/s3Manager';
 import { t, tp } from '../l10n';
+import { getErrorMessage } from '../utils/errorHandling';
 
 /**
  * 执行本地配置的静态校验
@@ -17,7 +18,7 @@ function localCheck(profile: S3Profile) {
     must.push('region');
   }
   for (const k of must) {
-    if (!(profile as any)?.[k]) {
+    if (!profile[k]) {
       miss.push(String(k));
     }
   }
@@ -63,10 +64,10 @@ async function onlineCheck(plugin: Plugin) {
     const [{ presignAndPutObject }] = await Promise.all([
       import('../uploader/presignPut'),
     ]);
-    await presignAndPutObject(plugin as any, { key: testKey, contentType, bodyBase64: tinyPngBase64 });
+    await presignAndPutObject(plugin, { key: testKey, contentType, bodyBase64: tinyPngBase64 });
     new Notice(tp('Test upload succeeded: {bytes} bytes', { bytes: String(bytes) }));
     return true;
-  } catch (e: any) {
+  } catch (e: unknown) {
     // 对于在线测试，直接抛出原始错误，让调用方处理
     throw e;
   }
@@ -86,7 +87,7 @@ export async function runCheck(plugin: Plugin) {
     // 2. 在线测试
     await onlineCheck(plugin);
 
-  } catch (e: any) {
-    new Notice(tp('Check failed: {error}', { error: e?.message ?? String(e) }));
+  } catch (e: unknown) {
+    new Notice(tp('Check failed: {error}', { error: getErrorMessage(e) }));
   }
 }

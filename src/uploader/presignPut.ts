@@ -123,7 +123,7 @@ export async function putWithHttps(
 
   await new Promise<void>((resolve, reject) => {
     let finished = false;
-    const failOnce = (err: any) => {
+    const failOnce = (err: Error) => {
       if (finished) return;
       finished = true;
       try { timer && clearTimeout(timer); } catch {}

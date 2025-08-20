@@ -2,10 +2,21 @@ import { App } from 'obsidian';
 
 const DATA_FILE = 'data.json';
 
+export interface ActivityDetails {
+  url?: string;
+  fileName?: string;
+  source?: 'paste' | 'command' | 'clipboard' | 'paste_unexpected';
+  size?: number;
+  duration?: number;
+  error?: string;
+  message?: string;
+  [key: string]: unknown;
+}
+
 export interface Activity {
   timestamp: string;
   event: 'upload_success' | 'upload_error' | 'cleanup_manual' | 'info' | 'warn';
-  details: any;
+  details: ActivityDetails;
 }
 
 async function readData(app: App): Promise<{ activities: Activity[] }> {
@@ -28,7 +39,7 @@ async function writeData(app: App, data: { activities: Activity[] }): Promise<vo
 }
 
 export const activityLog = {
-  async add(app: App, event: Activity['event'], details: any): Promise<void> {
+  async add(app: App, event: Activity['event'], details: ActivityDetails): Promise<void> {
     const data = await readData(app);
     const newActivity: Activity = {
       timestamp: new Date().toISOString(),

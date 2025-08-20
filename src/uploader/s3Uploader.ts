@@ -40,10 +40,10 @@ function validateR2ApiEndpoint(ep: string) {
   }
 }
 
-function classifyError(e: any): string {
+function classifyError(e: Error): string {
   const msg = (e?.message ?? '').toString();
   const name = (e?.name ?? '').toString();
-  const code = (e?.code ?? '').toString();
+  const code = (e as any)?.code ?? '';
 
   // DNS/连接类
   if (/ENOTFOUND|EAI_AGAIN/i.test(code) || /ENOTFOUND|EAI_AGAIN/i.test(msg)) {

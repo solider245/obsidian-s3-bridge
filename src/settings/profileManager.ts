@@ -117,7 +117,7 @@ export function renderProfileForm(plugin: MyPlugin, containerEl: HTMLElement, di
       setting.addToggle(tg => {
         tg.setValue(Boolean(currentVal ?? field.defaultValue ?? false));
         tg.onChange((v) => {
-          const patch: any = { id: active.id, [field.key]: v };
+          const patch: Partial<S3Profile> = { id: active.id, [field.key]: v };
           upsertProfile(plugin, patch);
         });
       });
@@ -131,7 +131,7 @@ export function renderProfileForm(plugin: MyPlugin, containerEl: HTMLElement, di
           } catch {}
         }
         tx.onChange((v) => {
-          const patch: any = { id: active.id, [field.key]: v.trim() };
+          const patch: Partial<S3Profile> = { id: active.id, [field.key]: v.trim() };
           upsertProfile(plugin, patch);
         });
       });

@@ -7,6 +7,7 @@ import { makeObjectKey } from '../core/objectKey';
 import { buildPublicUrl, loadS3Config } from '../../s3/s3Manager';
 import { activityLog } from '../activityLog';
 import { generateUploadId } from '../utils/generateUploadId';
+import { createUploadError, getErrorMessage, getErrorType } from '../utils/errorHandling';
 
 export interface PasteCtx {
   plugin: Plugin;
@@ -48,20 +49,22 @@ export function installPasteHandler(ctx: PasteCtx): void {
         let finalUrl = '';
         const startTime = Date.now();
         try {
-          await performUpload(plugin, {
+          finalUrl = await performUpload(plugin, {
             key,
             mime,
             base64,
+            fileName: file.name,
           });
-          finalUrl = buildPublicUrl(plugin, key);
-        } catch (e: any) {
-          const errorMsg = e?.message ?? String(e);
+        } catch (e: unknown) {
+          const errorMsg = getErrorMessage(e);
+          const errorType = getErrorType(e);
           editor.replaceSelection(`![Upload Failed: ${file.name}]()`);
           new Notice(tp('Upload failed: {error}', { error: errorMsg }));
           await activityLog.add(plugin.app, 'upload_error', {
             error: errorMsg,
             fileName: file.name,
             source: 'paste',
+            errorType,
           });
           return;
         }
@@ -89,12 +92,14 @@ export function installPasteHandler(ctx: PasteCtx): void {
           duration: parseFloat(durationInSeconds),
         });
 
-      } catch (e: any) {
-        const errorMsg = e?.message ?? String(e);
+      } catch (e: unknown) {
+        const errorMsg = getErrorMessage(e);
+        const errorType = getErrorType(e);
         new Notice(tp('Upload failed: {error}', { error: errorMsg }));
         await activityLog.add(plugin.app, 'upload_error', {
           error: errorMsg,
           source: 'paste_unexpected',
+          errorType,
         });
       }
     })

@@ -164,7 +164,7 @@ export function renderActivityLogSection(app: App, containerEl: HTMLElement) {
       const totalUploads = successCount + errorCount;
       const totalSize = allLogs
         .filter(log => log.event === 'upload_success' && log.details && log.details.size)
-        .reduce((sum, log) => sum + log.details.size, 0);
+        .reduce((sum, log) => sum + (log.details.size || 0), 0);
       const totalSizeMB = (totalSize / 1024 / 1024).toFixed(2);
 
       summaryContainer.setText(

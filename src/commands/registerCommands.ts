@@ -13,6 +13,7 @@ import { runCheck } from '../features/runCheck';
 import { performUpload } from '../upload/performUpload';
 import { makeObjectKey } from '../core/objectKey';
 import { generateUploadId } from '../utils/generateUploadId';
+import { getErrorMessage, getErrorType } from '../utils/errorHandling';
 
 export interface RegisterCtx {
   plugin: Plugin;
@@ -72,7 +73,7 @@ export function registerCommands(ctx: RegisterCtx) {
         const uploadId = generateUploadId();
         const key = makeObjectKey(choice.name || 'clipboard-upload', ext, keyPrefix, uploadId);
 
-        const url = await performUpload(plugin, { key, mime, base64 });
+        const url = await performUpload(plugin, { key, mime, base64, fileName: choice.name });
 
         const view = plugin.app.workspace.getActiveViewOfType(MarkdownView);
         if (view) {
@@ -84,8 +85,9 @@ export function registerCommands(ctx: RegisterCtx) {
             editor.replaceSelection(`[${safeName}](${url})`);
           }
         }
-      } catch (e: any) {
-        new Notice(tp('Upload failed: {error}', { error: e?.message ?? String(e) }));
+      } catch (e: unknown) {
+        const errorMsg = getErrorMessage(e);
+        new Notice(tp('Upload failed: {error}', { error: errorMsg }));
       }
     },
   });
@@ -118,7 +120,12 @@ export function registerCommands(ctx: RegisterCtx) {
         const uploadId = generateUploadId();
         const key = makeObjectKey('clipboard-upload', ext, keyPrefix, uploadId);
 
-        const url = await performUpload(plugin, { key, mime: clip.mime || 'application/octet-stream', base64: clip.base64 });
+        const url = await performUpload(plugin, { 
+          key, 
+          mime: clip.mime || 'application/octet-stream', 
+          base64: clip.base64,
+          fileName: 'clipboard-image'
+        });
 
         const md = `![](${url})`;
         const view = plugin.app.workspace.getActiveViewOfType(MarkdownView);
@@ -126,8 +133,9 @@ export function registerCommands(ctx: RegisterCtx) {
           const editor: Editor = view.editor;
           editor.replaceSelection(md);
         }
-      } catch (e: any) {
-        new Notice(tp('Upload failed: {error}', { error: e?.message ?? String(e) }));
+      } catch (e: unknown) {
+        const errorMsg = getErrorMessage(e);
+        new Notice(tp('Upload failed: {error}', { error: errorMsg }));
       }
     },
   });
