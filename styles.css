@@ -348,3 +348,275 @@ If your plugin does not need CSS, delete this file.
   max-height: 80vh;
   overflow-y: auto;
 }
+
+/* 拖拽上传样式 */
+.s3-bridge-drop-zone {
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.s3-bridge-drop-zone.s3-bridge-drag-active {
+  background-color: var(--background-modifier-hover) !important;
+  border: 2px dashed var(--color-accent) !important;
+  border-radius: 8px !important;
+}
+
+.s3-bridge-drop-zone.s3-bridge-drop-zone-active {
+  background-color: var(--background-modifier-hover) !important;
+  border-color: var(--color-accent) !important;
+}
+
+.s3-bridge-drop-zone.s3-bridge-drag-over {
+  background-color: var(--background-modifier-hover) !important;
+  border: 2px solid var(--color-accent) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 0 0 4px var(--color-accent-hover) !important;
+}
+
+.s3-bridge-drag-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  padding: 20px;
+  border-radius: 8px;
+  border: 2px dashed var(--text-muted);
+  font-size: 14px;
+  font-weight: 500;
+  text-align: center;
+  pointer-events: none;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(4px);
+  background-color: rgba(var(--background-primary-rgb), 0.95);
+}
+
+.s3-bridge-drag-hint::before {
+  content: '📁';
+  display: block;
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+/* 编辑器拖拽区域增强 */
+.markdown-source-view.mod-cm6 .cm-content {
+  min-height: 100px;
+}
+
+.markdown-source-view.mod-cm6.s3-bridge-drag-over {
+  background-color: var(--background-modifier-hover) !important;
+  border: 2px dashed var(--color-accent) !important;
+  border-radius: 4px !important;
+}
+
+.markdown-preview-view.s3-bridge-drag-over {
+  background-color: var(--background-modifier-hover) !important;
+  border: 2px dashed var(--color-accent) !important;
+  border-radius: 4px !important;
+}
+
+/* 拖拽时的文件预览 */
+.s3-bridge-file-preview {
+  position: fixed;
+  pointer-events: none;
+  z-index: 1000;
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  padding: 8px;
+  font-size: 12px;
+  color: var(--text-normal);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(4px);
+  background-color: rgba(var(--background-primary-rgb), 0.95);
+}
+
+.s3-bridge-file-preview .file-icon {
+  margin-right: 4px;
+}
+
+.s3-bridge-file-preview .file-name {
+  font-weight: 500;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.s3-bridge-file-preview .file-size {
+  color: var(--text-muted);
+  font-size: 11px;
+  margin-left: 4px;
+}
+
+/* 拖拽状态指示器 */
+.s3-bridge-drag-indicator {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(4px);
+  background-color: rgba(var(--background-primary-rgb), 0.95);
+  border: 1px solid var(--background-modifier-border);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.s3-bridge-drag-indicator::before {
+  content: '📤';
+  font-size: 14px;
+}
+
+.s3-bridge-drag-indicator.active {
+  background-color: var(--color-accent);
+  color: var(--text-on-accent);
+  border-color: var(--color-accent);
+}
+
+/* 文件类型图标 */
+.s3-bridge-file-type-icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.s3-bridge-file-type-icon.image::before {
+  content: '🖼️';
+}
+
+.s3-bridge-file-type-icon.pdf::before {
+  content: '📄';
+}
+
+.s3-bridge-file-type-icon.text::before {
+  content: '📝';
+}
+
+.s3-bridge-file-type-icon.video::before {
+  content: '🎥';
+}
+
+.s3-bridge-file-type-icon.audio::before {
+  content: '🎵';
+}
+
+.s3-bridge-file-type-icon.archive::before {
+  content: '📦';
+}
+
+.s3-bridge-file-type-icon.default::before {
+  content: '📎';
+}
+
+/* 拖拽时的动画效果 */
+@keyframes s3-bridge-drag-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+}
+
+.s3-bridge-drag-active .s3-bridge-drag-hint {
+  animation: s3-bridge-drag-pulse 2s ease-in-out infinite;
+}
+
+/* 拖拽时的边框动画 */
+@keyframes s3-bridge-drag-border {
+  0% {
+    border-color: var(--color-accent);
+  }
+  50% {
+    border-color: var(--color-accent-hover);
+  }
+  100% {
+    border-color: var(--color-accent);
+  }
+}
+
+.s3-bridge-drop-zone.s3-bridge-drag-over {
+  animation: s3-bridge-drag-border 1.5s ease-in-out infinite;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .s3-bridge-drag-hint {
+    padding: 16px;
+    font-size: 12px;
+    max-width: 80%;
+  }
+  
+  .s3-bridge-drag-indicator {
+    top: 10px;
+    right: 10px;
+    padding: 6px 12px;
+    font-size: 11px;
+  }
+  
+  .s3-bridge-file-preview {
+    max-width: 150px;
+    font-size: 11px;
+  }
+}
+
+/* 暗色主题优化 */
+.theme-dark .s3-bridge-drag-hint {
+  background-color: rgba(var(--background-primary-rgb), 0.98);
+  border-color: var(--text-muted);
+}
+
+.theme-dark .s3-bridge-file-preview {
+  background-color: rgba(var(--background-primary-rgb), 0.98);
+  border-color: var(--background-modifier-border);
+}
+
+.theme-dark .s3-bridge-drag-indicator {
+  background-color: rgba(var(--background-primary-rgb), 0.98);
+  border-color: var(--background-modifier-border);
+}
+
+/* 高对比度主题支持 */
+.theme-dark .s3-bridge-drop-zone.s3-bridge-drag-over {
+  border-width: 3px !important;
+  box-shadow: 0 0 0 6px var(--color-accent-hover) !important;
+}
+
+/* 无障碍支持 */
+.s3-bridge-drop-zone.s3-bridge-drag-over:focus-within {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* 拖拽时的文本选择禁用 */
+.s3-bridge-drop-zone.s3-bridge-drag-over * {
+  user-select: none;
+  pointer-events: none;
+}
+
+/* 拖拽时的光标样式 */
+.s3-bridge-drop-zone.s3-bridge-drag-over {
+  cursor: copy;
+}
+
+.s3-bridge-drop-zone.s3-bridge-drag-active {
+  cursor: copy;
+}
