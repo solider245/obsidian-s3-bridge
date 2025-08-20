@@ -12,7 +12,7 @@
 
 import { Notice, Plugin } from 'obsidian'
 import { t, tp } from './src/l10n'
-import { MyPluginSettingTab } from './settingsTab'
+import { MyPluginSettingTab, MyPluginSettings, DEFAULT_SETTINGS } from './settingsTab'
 import { registerCommands } from './src/commands/registerCommands'
 import { installPasteHandler } from './src/paste/installPasteHandler'
 import { getFileExtensionFromMime } from './src/core/mime'
@@ -27,7 +27,11 @@ import {
 import { registerBuiltinPacksAndLoad } from './src/index'
 
 export default class S3BridgePlugin extends Plugin {
+	settings: MyPluginSettings
+
 	async onload() {
+		// 加载设置
+		await this.loadSettings()
 		await registerBuiltinPacksAndLoad(this)
 
 		// 初始化上传通知系统
@@ -82,5 +86,13 @@ export default class S3BridgePlugin extends Plugin {
 		} catch {
 			/* ignore logging errors */
 		}
+	}
+
+	async loadSettings() {
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData())
+	}
+
+	async saveSettings() {
+		await this.saveData(this.settings)
 	}
 }
