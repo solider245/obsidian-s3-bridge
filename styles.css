@@ -6,3 +6,345 @@ available in the app when your plugin is enabled.
 If your plugin does not need CSS, delete this file.
 
 */
+
+/* 批量上传模态框样式 */
+.batch-upload-selection {
+  margin: 20px 0;
+  padding: 20px;
+  border: 2px dashed var(--background-modifier-border);
+  border-radius: 8px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.batch-upload-selection:hover {
+  border-color: var(--interactive-accent);
+  background-color: var(--background-secondary);
+}
+
+.batch-upload-select-button {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.batch-upload-select-button:hover {
+  background-color: var(--interactive-accent-hover);
+}
+
+.batch-upload-drop-hint {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin-top: 10px;
+}
+
+.batch-upload-progress {
+  margin: 20px 0;
+  padding: 15px;
+  background-color: var(--background-secondary);
+  border-radius: 8px;
+}
+
+.batch-upload-progress-container {
+  margin-bottom: 10px;
+}
+
+.batch-upload-progress-bar {
+  width: 100%;
+  height: 8px;
+  background-color: var(--background-modifier-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.batch-upload-progress-fill {
+  height: 100%;
+  background-color: var(--interactive-accent);
+  transition: width 0.3s ease;
+}
+
+.batch-upload-progress-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.batch-upload-list-container {
+  margin: 20px 0;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.batch-upload-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  background-color: var(--background-secondary);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.batch-upload-clear-button {
+  background-color: var(--background-modifier-error);
+  color: var(--text-on-accent);
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.batch-upload-clear-button:hover {
+  background-color: var(--text-error);
+}
+
+.batch-upload-items-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.batch-upload-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 15px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.batch-upload-item:last-child {
+  border-bottom: none;
+}
+
+.batch-upload-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.batch-upload-item-name {
+  font-weight: 500;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.batch-upload-item-size {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.batch-upload-item-status {
+  flex: 1;
+  margin: 0 15px;
+  min-width: 200px;
+}
+
+.batch-upload-status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.batch-upload-status-pending {
+  background-color: var(--background-modifier-border);
+  color: var(--text-muted);
+}
+
+.batch-upload-status-uploading {
+  background-color: var(--color-accent);
+  color: var(--text-on-accent);
+}
+
+.batch-upload-status-completed {
+  background-color: var(--color-green);
+  color: var(--text-on-accent);
+}
+
+.batch-upload-status-failed {
+  background-color: var(--color-red);
+  color: var(--text-on-accent);
+}
+
+.batch-upload-status-cancelled {
+  background-color: var(--color-orange);
+  color: var(--text-on-accent);
+}
+
+.batch-upload-item-progress {
+  width: 100%;
+  height: 4px;
+  background-color: var(--background-modifier-border);
+  border-radius: 2px;
+  overflow: hidden;
+  margin: 4px 0;
+}
+
+.batch-upload-item-progress-fill {
+  height: 100%;
+  background-color: var(--color-accent);
+  transition: width 0.3s ease;
+}
+
+.batch-upload-item-error {
+  font-size: 11px;
+  color: var(--text-error);
+  margin-top: 2px;
+}
+
+.batch-upload-item-actions {
+  display: flex;
+  gap: 5px;
+}
+
+.batch-upload-item-cancel,
+.batch-upload-item-retry,
+.batch-upload-item-remove {
+  background-color: var(--background-modifier-border);
+  color: var(--text-normal);
+  border: none;
+  padding: 2px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.batch-upload-item-cancel:hover {
+  background-color: var(--color-orange);
+  color: var(--text-on-accent);
+}
+
+.batch-upload-item-retry:hover {
+  background-color: var(--color-accent);
+  color: var(--text-on-accent);
+}
+
+.batch-upload-item-remove:hover {
+  background-color: var(--color-red);
+  color: var(--text-on-accent);
+}
+
+.batch-upload-controls {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin: 20px 0;
+}
+
+.batch-upload-start-button,
+.batch-upload-pause-button,
+.batch-upload-stop-button,
+.batch-upload-retry-button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.batch-upload-start-button {
+  background-color: var(--color-accent);
+  color: var(--text-on-accent);
+}
+
+.batch-upload-start-button:hover:not(:disabled) {
+  background-color: var(--color-accent-hover);
+}
+
+.batch-upload-pause-button {
+  background-color: var(--color-orange);
+  color: var(--text-on-accent);
+}
+
+.batch-upload-pause-button:hover:not(:disabled) {
+  background-color: var(--color-orange-hover);
+}
+
+.batch-upload-stop-button {
+  background-color: var(--color-red);
+  color: var(--text-on-accent);
+}
+
+.batch-upload-stop-button:hover:not(:disabled) {
+  background-color: var(--color-red-hover);
+}
+
+.batch-upload-retry-button {
+  background-color: var(--color-yellow);
+  color: var(--text-on-accent);
+}
+
+.batch-upload-retry-button:hover:not(:disabled) {
+  background-color: var(--color-yellow-hover);
+}
+
+.batch-upload-start-button:disabled,
+.batch-upload-pause-button:disabled,
+.batch-upload-stop-button:disabled,
+.batch-upload-retry-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.batch-upload-stats {
+  margin: 20px 0;
+  padding: 15px;
+  background-color: var(--background-secondary);
+  border-radius: 8px;
+}
+
+.batch-upload-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 15px;
+}
+
+.batch-upload-stat-item {
+  text-align: center;
+}
+
+.batch-upload-stat-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.batch-upload-stat-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.batch-upload-empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 40px 20px;
+  font-style: italic;
+}
+
+/* 拖拽状态样式 */
+.batch-upload-drag-over {
+  background-color: var(--background-modifier-hover) !important;
+  border-color: var(--color-accent) !important;
+}
+
+/* 模态框样式调整 */
+.modal.batch-upload-modal {
+  max-width: 800px;
+  max-height: 90vh;
+}
+
+.batch-upload-modal .modal-content {
+  max-height: 80vh;
+  overflow-y: auto;
+}
