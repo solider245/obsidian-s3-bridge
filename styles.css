@@ -6,3 +6,1121 @@ available in the app when your plugin is enabled.
 If your plugin does not need CSS, delete this file.
 
 */
+
+/* 批量上传模态框样式 */
+.batch-upload-selection {
+  margin: 20px 0;
+  padding: 20px;
+  border: 2px dashed var(--background-modifier-border);
+  border-radius: 8px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.batch-upload-selection:hover {
+  border-color: var(--interactive-accent);
+  background-color: var(--background-secondary);
+}
+
+.batch-upload-select-button {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.batch-upload-select-button:hover {
+  background-color: var(--interactive-accent-hover);
+}
+
+.batch-upload-drop-hint {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin-top: 10px;
+}
+
+.batch-upload-progress {
+  margin: 20px 0;
+  padding: 15px;
+  background-color: var(--background-secondary);
+  border-radius: 8px;
+}
+
+.batch-upload-progress-container {
+  margin-bottom: 10px;
+}
+
+.batch-upload-progress-bar {
+  width: 100%;
+  height: 8px;
+  background-color: var(--background-modifier-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.batch-upload-progress-fill {
+  height: 100%;
+  background-color: var(--interactive-accent);
+  transition: width 0.3s ease;
+}
+
+.batch-upload-progress-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.batch-upload-list-container {
+  margin: 20px 0;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.batch-upload-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  background-color: var(--background-secondary);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.batch-upload-clear-button {
+  background-color: var(--background-modifier-error);
+  color: var(--text-on-accent);
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.batch-upload-clear-button:hover {
+  background-color: var(--text-error);
+}
+
+.batch-upload-items-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.batch-upload-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 15px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.batch-upload-item:last-child {
+  border-bottom: none;
+}
+
+.batch-upload-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.batch-upload-item-name {
+  font-weight: 500;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.batch-upload-item-size {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.batch-upload-item-status {
+  flex: 1;
+  margin: 0 15px;
+  min-width: 200px;
+}
+
+.batch-upload-status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.batch-upload-status-pending {
+  background-color: var(--background-modifier-border);
+  color: var(--text-muted);
+}
+
+.batch-upload-status-uploading {
+  background-color: var(--color-accent);
+  color: var(--text-on-accent);
+}
+
+.batch-upload-status-completed {
+  background-color: var(--color-green);
+  color: var(--text-on-accent);
+}
+
+.batch-upload-status-failed {
+  background-color: var(--color-red);
+  color: var(--text-on-accent);
+}
+
+.batch-upload-status-cancelled {
+  background-color: var(--color-orange);
+  color: var(--text-on-accent);
+}
+
+.batch-upload-item-progress {
+  width: 100%;
+  height: 4px;
+  background-color: var(--background-modifier-border);
+  border-radius: 2px;
+  overflow: hidden;
+  margin: 4px 0;
+}
+
+.batch-upload-item-progress-fill {
+  height: 100%;
+  background-color: var(--color-accent);
+  transition: width 0.3s ease;
+}
+
+.batch-upload-item-error {
+  font-size: 11px;
+  color: var(--text-error);
+  margin-top: 2px;
+}
+
+.batch-upload-item-actions {
+  display: flex;
+  gap: 5px;
+}
+
+.batch-upload-item-cancel,
+.batch-upload-item-retry,
+.batch-upload-item-remove {
+  background-color: var(--background-modifier-border);
+  color: var(--text-normal);
+  border: none;
+  padding: 2px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.batch-upload-item-cancel:hover {
+  background-color: var(--color-orange);
+  color: var(--text-on-accent);
+}
+
+.batch-upload-item-retry:hover {
+  background-color: var(--color-accent);
+  color: var(--text-on-accent);
+}
+
+.batch-upload-item-remove:hover {
+  background-color: var(--color-red);
+  color: var(--text-on-accent);
+}
+
+.batch-upload-controls {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin: 20px 0;
+}
+
+.batch-upload-start-button,
+.batch-upload-pause-button,
+.batch-upload-stop-button,
+.batch-upload-retry-button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.batch-upload-start-button {
+  background-color: var(--color-accent);
+  color: var(--text-on-accent);
+}
+
+.batch-upload-start-button:hover:not(:disabled) {
+  background-color: var(--color-accent-hover);
+}
+
+.batch-upload-pause-button {
+  background-color: var(--color-orange);
+  color: var(--text-on-accent);
+}
+
+.batch-upload-pause-button:hover:not(:disabled) {
+  background-color: var(--color-orange-hover);
+}
+
+.batch-upload-stop-button {
+  background-color: var(--color-red);
+  color: var(--text-on-accent);
+}
+
+.batch-upload-stop-button:hover:not(:disabled) {
+  background-color: var(--color-red-hover);
+}
+
+.batch-upload-retry-button {
+  background-color: var(--color-yellow);
+  color: var(--text-on-accent);
+}
+
+.batch-upload-retry-button:hover:not(:disabled) {
+  background-color: var(--color-yellow-hover);
+}
+
+.batch-upload-start-button:disabled,
+.batch-upload-pause-button:disabled,
+.batch-upload-stop-button:disabled,
+.batch-upload-retry-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.batch-upload-stats {
+  margin: 20px 0;
+  padding: 15px;
+  background-color: var(--background-secondary);
+  border-radius: 8px;
+}
+
+.batch-upload-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 15px;
+}
+
+.batch-upload-stat-item {
+  text-align: center;
+}
+
+.batch-upload-stat-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.batch-upload-stat-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.batch-upload-empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 40px 20px;
+  font-style: italic;
+}
+
+/* 拖拽状态样式 */
+.batch-upload-drag-over {
+  background-color: var(--background-modifier-hover) !important;
+  border-color: var(--color-accent) !important;
+}
+
+/* 模态框样式调整 */
+.modal.batch-upload-modal {
+  max-width: 800px;
+  max-height: 90vh;
+}
+
+.batch-upload-modal .modal-content {
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+/* 拖拽上传样式 */
+.s3-bridge-drop-zone {
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.s3-bridge-drop-zone.s3-bridge-drag-active {
+  background-color: var(--background-modifier-hover) !important;
+  border: 2px dashed var(--color-accent) !important;
+  border-radius: 8px !important;
+}
+
+.s3-bridge-drop-zone.s3-bridge-drop-zone-active {
+  background-color: var(--background-modifier-hover) !important;
+  border-color: var(--color-accent) !important;
+}
+
+.s3-bridge-drop-zone.s3-bridge-drag-over {
+  background-color: var(--background-modifier-hover) !important;
+  border: 2px solid var(--color-accent) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 0 0 4px var(--color-accent-hover) !important;
+}
+
+.s3-bridge-drag-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  padding: 20px;
+  border-radius: 8px;
+  border: 2px dashed var(--text-muted);
+  font-size: 14px;
+  font-weight: 500;
+  text-align: center;
+  pointer-events: none;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(4px);
+  background-color: rgba(var(--background-primary-rgb), 0.95);
+}
+
+.s3-bridge-drag-hint::before {
+  content: '📁';
+  display: block;
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+/* 编辑器拖拽区域增强 */
+.markdown-source-view.mod-cm6 .cm-content {
+  min-height: 100px;
+}
+
+.markdown-source-view.mod-cm6.s3-bridge-drag-over {
+  background-color: var(--background-modifier-hover) !important;
+  border: 2px dashed var(--color-accent) !important;
+  border-radius: 4px !important;
+}
+
+.markdown-preview-view.s3-bridge-drag-over {
+  background-color: var(--background-modifier-hover) !important;
+  border: 2px dashed var(--color-accent) !important;
+  border-radius: 4px !important;
+}
+
+/* 拖拽时的文件预览 */
+.s3-bridge-file-preview {
+  position: fixed;
+  pointer-events: none;
+  z-index: 1000;
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  padding: 8px;
+  font-size: 12px;
+  color: var(--text-normal);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(4px);
+  background-color: rgba(var(--background-primary-rgb), 0.95);
+}
+
+.s3-bridge-file-preview .file-icon {
+  margin-right: 4px;
+}
+
+.s3-bridge-file-preview .file-name {
+  font-weight: 500;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.s3-bridge-file-preview .file-size {
+  color: var(--text-muted);
+  font-size: 11px;
+  margin-left: 4px;
+}
+
+/* 拖拽状态指示器 */
+.s3-bridge-drag-indicator {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(4px);
+  background-color: rgba(var(--background-primary-rgb), 0.95);
+  border: 1px solid var(--background-modifier-border);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.s3-bridge-drag-indicator::before {
+  content: '📤';
+  font-size: 14px;
+}
+
+.s3-bridge-drag-indicator.active {
+  background-color: var(--color-accent);
+  color: var(--text-on-accent);
+  border-color: var(--color-accent);
+}
+
+/* 文件类型图标 */
+.s3-bridge-file-type-icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.s3-bridge-file-type-icon.image::before {
+  content: '🖼️';
+}
+
+.s3-bridge-file-type-icon.pdf::before {
+  content: '📄';
+}
+
+.s3-bridge-file-type-icon.text::before {
+  content: '📝';
+}
+
+.s3-bridge-file-type-icon.video::before {
+  content: '🎥';
+}
+
+.s3-bridge-file-type-icon.audio::before {
+  content: '🎵';
+}
+
+.s3-bridge-file-type-icon.archive::before {
+  content: '📦';
+}
+
+.s3-bridge-file-type-icon.default::before {
+  content: '📎';
+}
+
+/* 拖拽时的动画效果 */
+@keyframes s3-bridge-drag-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+}
+
+.s3-bridge-drag-active .s3-bridge-drag-hint {
+  animation: s3-bridge-drag-pulse 2s ease-in-out infinite;
+}
+
+/* 拖拽时的边框动画 */
+@keyframes s3-bridge-drag-border {
+  0% {
+    border-color: var(--color-accent);
+  }
+  50% {
+    border-color: var(--color-accent-hover);
+  }
+  100% {
+    border-color: var(--color-accent);
+  }
+}
+
+.s3-bridge-drop-zone.s3-bridge-drag-over {
+  animation: s3-bridge-drag-border 1.5s ease-in-out infinite;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .s3-bridge-drag-hint {
+    padding: 16px;
+    font-size: 12px;
+    max-width: 80%;
+  }
+  
+  .s3-bridge-drag-indicator {
+    top: 10px;
+    right: 10px;
+    padding: 6px 12px;
+    font-size: 11px;
+  }
+  
+  .s3-bridge-file-preview {
+    max-width: 150px;
+    font-size: 11px;
+  }
+}
+
+/* 暗色主题优化 */
+.theme-dark .s3-bridge-drag-hint {
+  background-color: rgba(var(--background-primary-rgb), 0.98);
+  border-color: var(--text-muted);
+}
+
+.theme-dark .s3-bridge-file-preview {
+  background-color: rgba(var(--background-primary-rgb), 0.98);
+  border-color: var(--background-modifier-border);
+}
+
+.theme-dark .s3-bridge-drag-indicator {
+  background-color: rgba(var(--background-primary-rgb), 0.98);
+  border-color: var(--background-modifier-border);
+}
+
+/* 高对比度主题支持 */
+.theme-dark .s3-bridge-drop-zone.s3-bridge-drag-over {
+  border-width: 3px !important;
+  box-shadow: 0 0 0 6px var(--color-accent-hover) !important;
+}
+
+/* 无障碍支持 */
+.s3-bridge-drop-zone.s3-bridge-drag-over:focus-within {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* 拖拽时的文本选择禁用 */
+.s3-bridge-drop-zone.s3-bridge-drag-over * {
+  user-select: none;
+  pointer-events: none;
+}
+
+/* 拖拽时的光标样式 */
+.s3-bridge-drop-zone.s3-bridge-drag-over {
+  cursor: copy;
+}
+
+.s3-bridge-drop-zone.s3-bridge-drag-active {
+  cursor: copy;
+}
+
+/* 配置向导样式 */
+.s3-bridge-config-wizard {
+  max-width: 800px;
+  max-height: 90vh;
+  margin: 0 auto;
+}
+
+.s3-bridge-wizard-title {
+  text-align: center;
+  margin-bottom: 30px;
+  color: var(--text-normal);
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.s3-bridge-wizard-progress {
+  margin-bottom: 30px;
+}
+
+.s3-bridge-wizard-progress-container {
+  margin-bottom: 20px;
+}
+
+.s3-bridge-wizard-steps {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  position: relative;
+}
+
+.s3-bridge-wizard-steps::before {
+  content: '';
+  position: absolute;
+  top: 20px;
+  left: 40px;
+  right: 40px;
+  height: 2px;
+  background-color: var(--background-modifier-border);
+  z-index: 1;
+}
+
+.s3-bridge-wizard-step-indicator {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 80px;
+}
+
+.s3-bridge-wizard-step-number {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: var(--background-modifier-border);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 8px;
+  transition: all 0.3s ease;
+}
+
+.s3-bridge-wizard-step-indicator.active .s3-bridge-wizard-step-number {
+  background-color: var(--color-accent);
+  color: var(--text-on-accent);
+  transform: scale(1.1);
+}
+
+.s3-bridge-wizard-step-indicator.completed .s3-bridge-wizard-step-number {
+  background-color: var(--color-green);
+  color: var(--text-on-accent);
+}
+
+.s3-bridge-wizard-step-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.3;
+}
+
+.s3-bridge-wizard-step-indicator.active .s3-bridge-wizard-step-title,
+.s3-bridge-wizard-step-indicator.completed .s3-bridge-wizard-step-title {
+  color: var(--text-normal);
+}
+
+.s3-bridge-wizard-progress-bar {
+  width: 100%;
+  height: 4px;
+  background-color: var(--background-modifier-border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.s3-bridge-wizard-progress-fill {
+  height: 100%;
+  background-color: var(--color-accent);
+  transition: width 0.3s ease;
+}
+
+.s3-bridge-wizard-step-content {
+  min-height: 300px;
+  margin-bottom: 30px;
+}
+
+.s3-bridge-wizard-step-title {
+  color: var(--text-normal);
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.s3-bridge-wizard-step-description {
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+.s3-bridge-wizard-navigation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.s3-bridge-wizard-back-button,
+.s3-bridge-wizard-next-button,
+.s3-bridge-wizard-finish-button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.s3-bridge-wizard-back-button {
+  background-color: var(--background-modifier-border);
+  color: var(--text-normal);
+}
+
+.s3-bridge-wizard-back-button:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.s3-bridge-wizard-next-button,
+.s3-bridge-wizard-finish-button {
+  background-color: var(--color-accent);
+  color: var(--text-on-accent);
+}
+
+.s3-bridge-wizard-next-button:hover:not(:disabled),
+.s3-bridge-wizard-finish-button:hover:not(:disabled) {
+  background-color: var(--color-accent-hover);
+}
+
+.s3-bridge-wizard-next-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 欢迎页面样式 */
+.s3-bridge-wizard-welcome {
+  text-align: center;
+  padding: 20px;
+}
+
+.s3-bridge-wizard-welcome p {
+  margin-bottom: 15px;
+  line-height: 1.6;
+  color: var(--text-normal);
+}
+
+.s3-bridge-wizard-features {
+  list-style: none;
+  padding: 0;
+  margin: 20px 0;
+  text-align: left;
+  display: inline-block;
+}
+
+.s3-bridge-wizard-features li {
+  margin-bottom: 8px;
+  padding-left: 20px;
+  position: relative;
+}
+
+.s3-bridge-wizard-features li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: var(--color-green);
+  font-weight: bold;
+}
+
+/* 服务商选择样式 */
+.s3-bridge-wizard-providers {
+  padding: 20px 0;
+}
+
+.s3-bridge-wizard-template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.s3-bridge-wizard-template-card {
+  border: 2px solid var(--background-modifier-border);
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background-color: var(--background-secondary);
+}
+
+.s3-bridge-wizard-template-card:hover {
+  border-color: var(--color-accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.s3-bridge-wizard-template-card.selected {
+  border-color: var(--color-accent);
+  background-color: var(--color-accent-bg);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.s3-bridge-wizard-template-icon {
+  font-size: 32px;
+  margin-bottom: 10px;
+}
+
+.s3-bridge-wizard-template-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-normal);
+  margin-bottom: 8px;
+}
+
+.s3-bridge-wizard-template-description {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+
+.s3-bridge-wizard-template-features {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 15px;
+  text-align: left;
+}
+
+.s3-bridge-wizard-template-feature {
+  margin-bottom: 4px;
+}
+
+.s3-bridge-wizard-template-select {
+  background-color: var(--color-accent);
+  color: var(--text-on-accent);
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.s3-bridge-wizard-template-select:hover {
+  background-color: var(--color-accent-hover);
+}
+
+.s3-bridge-wizard-template-card.selected .s3-bridge-wizard-template-select {
+  background-color: var(--color-green);
+}
+
+/* 表单样式 */
+.s3-bridge-wizard-form {
+  padding: 20px 0;
+}
+
+.s3-bridge-wizard-template-info {
+  background-color: var(--background-modifier-hover);
+  padding: 15px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+}
+
+.s3-bridge-wizard-template-info h4 {
+  margin: 0 0 8px 0;
+  color: var(--text-normal);
+}
+
+.s3-bridge-wizard-template-endpoint {
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* 测试页面样式 */
+.s3-bridge-wizard-test {
+  text-align: center;
+  padding: 20px;
+}
+
+.s3-bridge-wizard-test-info {
+  margin-bottom: 20px;
+}
+
+.s3-bridge-wizard-test-button {
+  background-color: var(--color-accent);
+  color: var(--text-on-accent);
+  border: none;
+  padding: 12px 24px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 20px;
+  transition: all 0.2s ease;
+}
+
+.s3-bridge-wizard-test-button:hover:not(:disabled) {
+  background-color: var(--color-accent-hover);
+}
+
+.s3-bridge-wizard-test-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.s3-bridge-wizard-test-result {
+  text-align: left;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.s3-bridge-wizard-test-success {
+  color: var(--color-green);
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.s3-bridge-wizard-test-error {
+  color: var(--color-red);
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.s3-bridge-wizard-test-details {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* 完成页面样式 */
+.s3-bridge-wizard-complete {
+  text-align: center;
+  padding: 20px;
+}
+
+.s3-bridge-wizard-complete h3 {
+  color: var(--color-green);
+  margin-bottom: 15px;
+  font-size: 24px;
+}
+
+.s3-bridge-wizard-complete p {
+  margin-bottom: 15px;
+  color: var(--text-normal);
+  line-height: 1.6;
+}
+
+.s3-bridge-wizard-summary {
+  background-color: var(--background-modifier-hover);
+  padding: 20px;
+  border-radius: 8px;
+  margin: 20px 0;
+  text-align: left;
+}
+
+.s3-bridge-wizard-summary h4 {
+  margin: 0 0 10px 0;
+  color: var(--text-normal);
+}
+
+.s3-bridge-wizard-summary ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.s3-bridge-wizard-summary li {
+  margin-bottom: 5px;
+  color: var(--text-normal);
+}
+
+.s3-bridge-wizard-finish-button {
+  background-color: var(--color-green);
+  color: var(--text-on-accent);
+  border: none;
+  padding: 12px 30px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.s3-bridge-wizard-finish-button:hover {
+  background-color: var(--color-green-hover);
+  transform: translateY(-1px);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .s3-bridge-config-wizard {
+    margin: 10px;
+  }
+  
+  .s3-bridge-wizard-steps {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .s3-bridge-wizard-steps::before {
+    display: none;
+  }
+  
+  .s3-bridge-wizard-step-indicator {
+    flex-direction: row;
+    margin-bottom: 15px;
+    min-width: auto;
+  }
+  
+  .s3-bridge-wizard-step-number {
+    margin-bottom: 0;
+    margin-right: 10px;
+  }
+  
+  .s3-bridge-wizard-template-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .s3-bridge-wizard-navigation {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .s3-bridge-wizard-back-button,
+  .s3-bridge-wizard-next-button,
+  .s3-bridge-wizard-finish-button {
+    width: 100%;
+  }
+}
+
+/* 动画效果 */
+@keyframes s3-bridge-wizard-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.s3-bridge-wizard-step-content {
+  animation: s3-bridge-wizard-fade-in 0.3s ease;
+}
+
+/* 错误状态样式 */
+.s3-bridge-wizard-error {
+  border: 1px solid var(--color-red);
+  background-color: var(--color-red-bg);
+  color: var(--color-red);
+  padding: 10px;
+  border-radius: 4px;
+  margin: 10px 0;
+  font-size: 12px;
+}
+
+/* 成功状态样式 */
+.s3-bridge-wizard-success {
+  border: 1px solid var(--color-green);
+  background-color: var(--color-green-bg);
+  color: var(--color-green);
+  padding: 10px;
+  border-radius: 4px;
+  margin: 10px 0;
+  font-size: 12px;
+}
