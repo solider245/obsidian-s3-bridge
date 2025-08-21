@@ -1,98 +1,88 @@
-name: 自动发布 Obsidian 插件
+name: Release Obsidian Plugin
 
 on:
   push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+    tags:
+      - 'v*'  # 在推送版本标签时触发 (例如: v1.0.0)
+
+# 关键修复：添加权限设置
+permissions:
+  contents: write  # 赋予写入内容的权限，包括创建release
 
 jobs:
-  release:
+  build-and-release:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-
+    
+    # 也可以在job级别设置权限
+    permissions:
+      contents: write  # 确保有创建release的权限
+    
     steps:
-      - name: 检出代码
-        uses: actions/checkout@v4
-
-      - name: 设置 Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'npm'
-          
-      - name: 配置环境变量
-        run: |
-          echo "NODE_OPTIONS=--max-old-space-size=4096" >> $GITHUB_ENV
-
-      - name: 安装依赖
-        run: npm ci
-
-      - name: 构建插件
-        run: npm run build
-
-      - name: 获取版本信息
-        id: version
-        run: |
-          VERSION=$(node -p "require('./package.json').version")
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "PLUGIN_NAME=obsidian-s3-bridge" >> $GITHUB_OUTPUT
-
-      - name: 创建发布目录
-        run: mkdir -p release
-
-      - name: 复制发布文件
-        run: |
-          cp main.js release/
-          cp manifest.json release/
-          cp styles.css release/
-
-      - name: 创建发布包
-        run: |
-          cd release
-          zip -r "obsidian-s3-bridge-v${{ steps.version.outputs.version }}.zip" main.js manifest.json styles.css
-
-      - name: 生成发布说明
-        id: release_notes
-        run: |
-          # 检查是否有变更日志
-          if [ -f "CHANGELOG.md" ]; then
-            # 提取当前版本的变更日志
-            NOTES=$(awk "/## \\[${{ steps.version.outputs.version }}\\]/,/^## /" CHANGELOG.md | sed '$d' | sed '1d')
-            echo "notes<<EOF" >> $GITHUB_OUTPUT
-            echo "$NOTES" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-          else
-            echo "notes<<EOF" >> $GITHUB_OUTPUT
-            echo "## 版本 ${{ steps.version.outputs.version }}" >> $GITHUB_OUTPUT
-            echo "" >> $GITHUB_OUTPUT
-            echo "### 主要改进" >> $GITHUB_OUTPUT
-            echo "- 自动构建和发布" >> $GITHUB_OUTPUT
-            echo "- 代码质量优化" >> $GITHUB_OUTPUT
-            echo "- 安全检查增强" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-          fi
-
-      - name: 创建 GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ steps.version.outputs.version }}
-          name: Obsidian S3-Bridge v${{ steps.version.outputs.version }}
-          body: ${{ steps.release_notes.outputs.notes }}
-          files: |
-            release/main.js
-            release/manifest.json
-            release/styles.css
-            release/obsidian-s3-bridge-v*.zip
-          draft: false
-          prerelease: false
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: 发布完成通知
-        run: |
-          echo "🎉 发布完成！"
-          echo "版本: ${{ steps.version.outputs.version }}"
-          echo "发布包: obsidian-s3-bridge-v${{ steps.version.outputs.version }}.zip"
-          echo "Release URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.version }}"
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        # 重要：需要获取tag信息
+        fetch-depth: 0
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: 配置环境变量
+      run: |
+        echo "NODE_OPTIONS=--max-old-space-size=4096" >> $GITHUB_ENV
+        
+    - name: Install dependencies
+      run: npm ci
+        
+    - name: Build plugin
+      run: npm run build
+        
+    - name: Verify required files exist
+      run: |
+        echo "Checking for required plugin files..."
+        if [ ! -f "main.js" ]; then
+          echo "❌ main.js not found!"
+          exit 1
+        fi
+        if [ ! -f "manifest.json" ]; then
+          echo "❌ manifest.json not found!"
+          exit 1
+        fi
+        if [ ! -f "styles.css" ]; then
+          echo "⚠️  styles.css not found (optional but recommended)"
+          # 创建一个空的styles.css如果不存在
+          echo "/* Empty stylesheet */" > styles.css
+        fi
+        echo "✅ All required files found!"
+        
+    - name: Create release package
+      run: |
+        # 获取版本号（从tag名）
+        VERSION=${GITHUB_REF#refs/tags/v}
+        PACKAGE_NAME="obsidian-s3-bridge-${VERSION}"
+        
+        # 创建临时目录并复制文件
+        mkdir -p $PACKAGE_NAME
+        cp main.js manifest.json styles.css $PACKAGE_NAME/
+        
+        # 创建ZIP包
+        zip -r "${PACKAGE_NAME}.zip" $PACKAGE_NAME/
+        
+        # 输出包信息
+        echo "Package created: ${PACKAGE_NAME}.zip"
+        ls -la *.zip
+        
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2  # 确保使用v2版本
+      with:
+        files: |
+          *.zip
+          main.js
+          manifest.json
+          styles.css
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
