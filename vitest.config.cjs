@@ -1,7 +1,7 @@
-import { defineConfig } from 'vitest/config'
-import { resolve } from 'node:path'
+const { defineConfig } = require('vitest/config')
+const { resolve } = require('path')
 
-export default defineConfig({
+module.exports = defineConfig({
 	test: {
 		include: ['tests/**/*.test.ts'],
 		exclude: ['node_modules', 'dist', '.obsidian', '.git'],
