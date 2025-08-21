@@ -1,9 +1,5 @@
 import { defineConfig } from 'vitest/config'
-import { fileURLToPath } from 'node:url'
-import { dirname, resolve } from 'node:path'
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
+import { resolve } from 'node:path'
 
 export default defineConfig({
 	test: {
@@ -19,7 +15,7 @@ export default defineConfig({
 	},
 	resolve: {
 		alias: {
-			obsidian: resolve(__dirname, 'tests/stubs/obsidian.ts'),
+			obsidian: resolve(process.cwd(), 'tests/stubs/obsidian.ts'),
 		},
 	},
 })
