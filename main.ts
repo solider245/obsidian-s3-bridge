@@ -131,9 +131,9 @@ export default class S3BridgePlugin extends Plugin {
 			// 检查Supabase连接状态
 			if (supabaseDatabaseManager.isConnectedToDatabase()) {
 				console.log('[obsidian-s3-bridge] Supabase连接成功')
-				
+
 				// 添加同步状态监听器
-				dataSyncService.addSyncListener((event) => {
+				dataSyncService.addSyncListener(event => {
 					this.handleSyncEvent(event)
 				})
 
@@ -170,7 +170,7 @@ export default class S3BridgePlugin extends Plugin {
 		}
 
 		const intervalMs = this.settings.syncInterval * 60 * 1000
-		
+
 		// 清理现有的定时器
 		if (this.syncTimer) {
 			clearInterval(this.syncTimer)

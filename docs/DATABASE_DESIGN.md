@@ -5,6 +5,7 @@
 ### 核心表结构
 
 #### 1. 文件元数据表 (files)
+
 ```sql
 CREATE TABLE files (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -50,6 +51,7 @@ CREATE INDEX idx_files_tags ON files USING GIN(tags);
 ```
 
 #### 2. 仓库配置表 (vaults)
+
 ```sql
 CREATE TABLE vaults (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -70,6 +72,7 @@ CREATE INDEX idx_vaults_device_id ON vaults(device_id);
 ```
 
 #### 3. 上传配置表 (upload_configs)
+
 ```sql
 CREATE TABLE upload_configs (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -97,6 +100,7 @@ CREATE INDEX idx_upload_configs_is_default ON upload_configs(is_default);
 ```
 
 #### 4. 使用统计表 (usage_stats)
+
 ```sql
 CREATE TABLE usage_stats (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -121,6 +125,7 @@ CREATE UNIQUE INDEX idx_usage_stats_user_date ON usage_stats(user_id, date);
 ```
 
 #### 5. 文件关联表 (file_relations)
+
 ```sql
 CREATE TABLE file_relations (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -139,6 +144,7 @@ CREATE INDEX idx_file_relations_target_file_id ON file_relations(target_file_id)
 ```
 
 #### 6. 同步日志表 (sync_logs)
+
 ```sql
 CREATE TABLE sync_logs (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -272,9 +278,9 @@ BEGIN
     ON CONFLICT (user_id, date) DO UPDATE SET
         total_uploads = usage_stats.total_uploads + 1,
         total_size = usage_stats.total_size + NEW.file_size,
-        successful_uploads = usage_stats.successful_uploads + 
+        successful_uploads = usage_stats.successful_uploads +
             CASE WHEN NEW.upload_status = 'completed' THEN 1 ELSE 0 END;
-    
+
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;

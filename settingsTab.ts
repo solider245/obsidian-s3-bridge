@@ -449,9 +449,7 @@ export class MyPluginSettingTab extends PluginSettingTab {
 			.setName('用户ID')
 			.setDesc('当前用户的唯一标识符')
 			.addText(text =>
-				text
-					.setValue(this.plugin.settings.userId ?? DEFAULT_SETTINGS.userId!)
-					.setDisabled(true)
+				text.setValue(this.plugin.settings.userId ?? DEFAULT_SETTINGS.userId!).setDisabled(true)
 			)
 	}
 }

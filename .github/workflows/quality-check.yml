@@ -1,10 +1,10 @@
 name: 代码质量检查 (可选)
 
 on:
-  workflow_dispatch:  # 允许手动触发
-  pull_request:       # 在PR时运行
+  workflow_dispatch: # 允许手动触发
+  pull_request: # 在PR时运行
   push:
-    branches: [main]  # 推送到main时运行
+    branches: [main] # 推送到main时运行
 
 jobs:
   quality-check:
