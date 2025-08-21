@@ -49,7 +49,7 @@ export const DEFAULT_SETTINGS: MyPluginSettings = {
 
 	// 新增上传设置
 	enableBatchUpload: true,
-	maxConcurrentUploads: 3,
+	maxConcurrentUploads: 2, // 优化：减少并发数，提升稳定性
 	enableDragDrop: true,
 	maxUploadSize: 50, // MB
 
