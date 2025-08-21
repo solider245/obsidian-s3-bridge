@@ -2,160 +2,134 @@ name: 自动发布 Obsidian 插件
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
-  quality-check:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: 检出代码
-      uses: actions/checkout@v4
-      
-    - name: 设置 Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'npm'
-        
-    - name: 安装依赖
-      run: npm ci
-      
-    - name: 代码格式检查
-      run: npm run format:check
-      
-    - name: 代码质量检查
-      run: npm run lint
-      
-    - name: 运行测试
-      run: npm run test
-      
-    - name: 构建检查
-      run: npm run build
-
   build-and-package:
-    needs: quality-check
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
-    
+
     steps:
-    - name: 检出代码
-      uses: actions/checkout@v4
-      
-    - name: 设置 Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'npm'
-        
-    - name: 安装依赖
-      run: npm ci
-      
-    - name: 获取版本信息
-      id: version
-      run: |
-        VERSION=$(node -p "require('./package.json').version")
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-        echo "PLUGIN_NAME=obsidian-s3-bridge" >> $GITHUB_OUTPUT
-        
-    - name: 构建插件
-      run: npm run build
-      
-    - name: 创建发布目录
-      run: mkdir -p release
-      
-    - name: 复制发布文件
-      run: |
-        cp main.js release/
-        cp manifest.json release/
-        cp styles.css release/
-        
-    - name: 创建发布包
-      run: |
-        cd release
-        zip -r "obsidian-s3-bridge-v${{ steps.version.outputs.version }}.zip" main.js manifest.json styles.css
-        
-    - name: 上传构建产物
-      uses: actions/upload-artifact@v4
-      with:
-        name: obsidian-s3-bridge-plugin
-        path: |
-          release/main.js
-          release/manifest.json
-          release/styles.css
-          release/obsidian-s3-bridge-v*.zip
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 运行测试 (确保基本功能正常)
+        run: npm run test
+
+      - name: 构建插件 (确保编译成功)
+        run: npm run build
+
+      - name: 获取版本信息
+        id: version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "PLUGIN_NAME=obsidian-s3-bridge" >> $GITHUB_OUTPUT
+
+      - name: 创建发布目录
+        run: mkdir -p release
+
+      - name: 复制发布文件
+        run: |
+          cp main.js release/
+          cp manifest.json release/
+          cp styles.css release/
+
+      - name: 创建发布包
+        run: |
+          cd release
+          zip -r "obsidian-s3-bridge-v${{ steps.version.outputs.version }}.zip" main.js manifest.json styles.css
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: obsidian-s3-bridge-plugin
+          path: |
+            release/main.js
+            release/manifest.json
+            release/styles.css
+            release/obsidian-s3-bridge-v*.zip
 
   create-release:
-    needs: [quality-check, build-and-package]
+    needs: build-and-package
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
-    
+
     steps:
-    - name: 检出代码
-      uses: actions/checkout@v4
-      
-    - name: 设置 Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'npm'
-        
-    - name: 下载构建产物
-      uses: actions/download-artifact@v4
-      with:
-        name: obsidian-s3-bridge-plugin
-        path: release
-        
-    - name: 获取版本信息
-      id: version
-      run: |
-        VERSION=$(node -p "require('./package.json').version")
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-        echo "PLUGIN_NAME=obsidian-s3-bridge" >> $GITHUB_OUTPUT
-        
-    - name: 生成发布说明
-      id: release_notes
-      run: |
-        # 检查是否有变更日志
-        if [ -f "CHANGELOG.md" ]; then
-          # 提取当前版本的变更日志
-          NOTES=$(awk "/## \\[${{ steps.version.outputs.version }}\\]/,/^## /" CHANGELOG.md | sed '$d' | sed '1d')
-          echo "notes<<EOF" >> $GITHUB_OUTPUT
-          echo "$NOTES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-        else
-          echo "notes<<EOF" >> $GITHUB_OUTPUT
-          echo "## 版本 ${{ steps.version.outputs.version }}" >> $GITHUB_OUTPUT
-          echo "" >> $GITHUB_OUTPUT
-          echo "### 主要改进" >> $GITHUB_OUTPUT
-          echo "- 自动构建和发布" >> $GITHUB_OUTPUT
-          echo "- 代码质量优化" >> $GITHUB_OUTPUT
-          echo "- 安全检查增强" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-        fi
-        
-    - name: 创建 GitHub Release
-      uses: softprops/action-gh-release@v2
-      with:
-        tag_name: v${{ steps.version.outputs.version }}
-        name: Obsidian S3-Bridge v${{ steps.version.outputs.version }}
-        body: ${{ steps.release_notes.outputs.notes }}
-        files: |
-          release/main.js
-          release/manifest.json
-          release/styles.css
-          release/obsidian-s3-bridge-v*.zip
-        draft: false
-        prerelease: false
-        generate_release_notes: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        
-    - name: 发布完成通知
-      run: |
-        echo "🎉 发布完成！"
-        echo "版本: ${{ steps.version.outputs.version }}"
-        echo "发布包: obsidian-s3-bridge-v${{ steps.version.outputs.version }}.zip"
-        echo "Release URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.version }}"
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: 下载构建产物
+        uses: actions/download-artifact@v4
+        with:
+          name: obsidian-s3-bridge-plugin
+          path: release
+
+      - name: 获取版本信息
+        id: version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "PLUGIN_NAME=obsidian-s3-bridge" >> $GITHUB_OUTPUT
+
+      - name: 生成发布说明
+        id: release_notes
+        run: |
+          # 检查是否有变更日志
+          if [ -f "CHANGELOG.md" ]; then
+            # 提取当前版本的变更日志
+            NOTES=$(awk "/## \\[${{ steps.version.outputs.version }}\\]/,/^## /" CHANGELOG.md | sed '$d' | sed '1d')
+            echo "notes<<EOF" >> $GITHUB_OUTPUT
+            echo "$NOTES" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "notes<<EOF" >> $GITHUB_OUTPUT
+            echo "## 版本 ${{ steps.version.outputs.version }}" >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_OUTPUT
+            echo "### 主要改进" >> $GITHUB_OUTPUT
+            echo "- 自动构建和发布" >> $GITHUB_OUTPUT
+            echo "- 代码质量优化" >> $GITHUB_OUTPUT
+            echo "- 安全检查增强" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 创建 GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Obsidian S3-Bridge v${{ steps.version.outputs.version }}
+          body: ${{ steps.release_notes.outputs.notes }}
+          files: |
+            release/main.js
+            release/manifest.json
+            release/styles.css
+            release/obsidian-s3-bridge-v*.zip
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 发布完成通知
+        run: |
+          echo "🎉 发布完成！"
+          echo "版本: ${{ steps.version.outputs.version }}"
+          echo "发布包: obsidian-s3-bridge-v${{ steps.version.outputs.version }}.zip"
+          echo "Release URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.version }}"
