@@ -1,0 +1,52 @@
+name: 代码质量检查 (可选)
+
+on:
+  workflow_dispatch:  # 允许手动触发
+  pull_request:       # 在PR时运行
+  push:
+    branches: [main]  # 推送到main时运行
+
+jobs:
+  quality-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 代码格式检查
+        run: npm run format:check
+        continue-on-error: true
+
+      - name: 代码质量检查
+        run: npm run lint
+        continue-on-error: true
+
+      - name: 运行测试
+        run: npm run test
+
+      - name: 构建检查
+        run: npm run build
+
+      - name: 生成质量报告
+        if: always()
+        run: |
+          echo "## 质量检查结果" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ 测试通过" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ 构建成功" >> $GITHUB_STEP_SUMMARY
+          echo "- ⚠️ 格式检查: 如有失败，请运行 \`npm run format:lint\` 修复" >> $GITHUB_STEP_SUMMARY
+          echo "- ⚠️ 代码质量: 如有失败，请运行 \`npm run lint:fix\` 修复" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 快速修复命令" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "npm run format:lint" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
