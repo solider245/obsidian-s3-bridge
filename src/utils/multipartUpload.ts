@@ -45,6 +45,7 @@ export class MultipartUploadManager {
 	private options: MultipartUploadOptions
 	private uploadId?: string
 	private parts: UploadPart[] = []
+	private partsSizeCache: Map<number, number> = new Map()
 	private client: S3Client
 	private bucket: string
 	private completedParts: Array<{ PartNumber: number; ETag: string }> = []
@@ -88,6 +89,7 @@ export class MultipartUploadManager {
 		const partCount = Math.ceil(fileSize / chunkSize!)
 
 		this.parts = []
+		this.partsSizeCache.clear()
 		for (let i = 0; i < partCount; i++) {
 			const start = i * chunkSize!
 			const end = Math.min(start + chunkSize!, fileSize)
@@ -101,6 +103,7 @@ export class MultipartUploadManager {
 				status: 'pending',
 				retryCount: 0,
 			})
+			this.partsSizeCache.set(i + 1, size)
 		}
 	}
 
@@ -259,8 +262,7 @@ export class MultipartUploadManager {
 	// 更新上传进度
 	private updateUploadProgress(uploadId: string): void {
 		const uploadedSize = this.completedParts.reduce((sum, p) => {
-			const partInfo = this.parts.find(part => part.partNumber === p.PartNumber)
-			return sum + (partInfo?.size || 0)
+			return sum + (this.partsSizeCache.get(p.PartNumber) || 0)
 		}, 0)
 		const progress = Math.floor((uploadedSize / this.options.fileSize) * 80) + 10 // 10-90%
 

@@ -31,7 +31,10 @@ function normalizeAndValidateEndpoint(endpoint: string): string {
  * - forcePathStyle: true 以兼容 R2
  * - region 默认 us-east-1
  * - tls 由配置控制
+ * - 使用缓存避免重复创建客户端
  */
+let cachedClient: { client: S3Client; bucket: string; endpoint: string; region: string; configHash: string } | null = null
+
 function buildS3Client(plugin: Plugin): {
 	client: S3Client
 	bucket: string
@@ -44,6 +47,12 @@ function buildS3Client(plugin: Plugin): {
 			'S3 settings incomplete: endpoint/accessKeyId/secretAccessKey/bucketName are required'
 		)
 	}
+
+	const configHash = `${cfg.endpoint}|${cfg.accessKeyId}|${cfg.bucketName}|${cfg.region || ''}`
+	if (cachedClient?.configHash === configHash) {
+		return cachedClient
+	}
+
 	const endpoint = normalizeAndValidateEndpoint(cfg.endpoint)
 	const region = cfg.region && cfg.region.trim() ? cfg.region.trim() : 'us-east-1'
 
@@ -58,6 +67,7 @@ function buildS3Client(plugin: Plugin): {
 		tls: cfg.useSSL,
 	})
 
+	cachedClient = { client, bucket: cfg.bucketName, endpoint, region, configHash }
 	return { client, bucket: cfg.bucketName, endpoint, region }
 }
 
@@ -77,13 +87,13 @@ export async function getPresignedPutUrl(
 	timeoutMs?: number
 ): Promise<string> {
 	const { client, bucket } = buildS3Client(plugin)
-	const cfg = loadS3Config(plugin)
+	const cacheControl = loadS3Config(plugin).cacheControl
 
 	const cmd = new PutObjectCommand({
 		Bucket: bucket,
 		Key: key,
 		ContentType: contentType || 'application/octet-stream',
-		CacheControl: cfg.cacheControl,
+		CacheControl: cacheControl,
 	})
 
 	const to =
