@@ -354,7 +354,7 @@ export class SupabaseDatabaseManager {
 			const { error } = await this.client!.from('files')
 				.update({
 					last_accessed_at: new Date().toISOString(),
-					access_count: (await this.getFile(fileId))?.access_count || 0 + 1,
+					access_count: ((await this.getFile(fileId))?.access_count || 0) + 1,
 				})
 				.eq('id', fileId)
 

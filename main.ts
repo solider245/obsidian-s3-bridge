@@ -109,7 +109,7 @@ export default class S3BridgePlugin extends Plugin {
 	/**
 	 * 初始化Supabase功能
 	 */
-	private initializeSupabase(): void {
+	private async initializeSupabase(): Promise<void> {
 		if (!this.settings.enableSupabaseSync) {
 			console.log('[obsidian-s3-bridge] Supabase同步已禁用')
 			return
@@ -125,7 +125,7 @@ export default class S3BridgePlugin extends Plugin {
 			// 生成或获取用户ID
 			if (!this.settings.userId) {
 				this.settings.userId = this.generateUserId()
-				this.saveSettings()
+				await this.saveSettings()
 			}
 
 			// 检查Supabase连接状态
@@ -133,9 +133,10 @@ export default class S3BridgePlugin extends Plugin {
 				console.log('[obsidian-s3-bridge] Supabase连接成功')
 
 				// 添加同步状态监听器
-				dataSyncService.addSyncListener(event => {
+				this.syncEventListener = (event: any) => {
 					this.handleSyncEvent(event)
-				})
+				}
+				dataSyncService.addSyncListener(this.syncEventListener)
 
 				// 如果启用自动同步，启动同步服务
 				if (this.settings.enableAutoSync) {
@@ -208,6 +209,7 @@ export default class S3BridgePlugin extends Plugin {
 
 	// 同步定时器
 	private syncTimer: NodeJS.Timeout | null = null
+	private syncEventListener: ((event: any) => void) | null = null
 
 	/**
 	 * 清理Supabase相关资源
@@ -219,6 +221,13 @@ export default class S3BridgePlugin extends Plugin {
 				clearInterval(this.syncTimer)
 				this.syncTimer = null
 				console.log('[obsidian-s3-bridge] 同步定时器已清理')
+			}
+
+			// 移除同步事件监听器
+			if (this.syncEventListener) {
+				dataSyncService.removeSyncListener(this.syncEventListener)
+				this.syncEventListener = null
+				console.log('[obsidian-s3-bridge] 同步事件监听器已清理')
 			}
 
 			// 重置同步服务状态

@@ -56,6 +56,9 @@ export class DataSyncService {
 	private isSyncing = false
 	private retryCount = 0
 	private maxRetries = 3
+	private autoSyncInterval: ReturnType<typeof setInterval> | null = null
+	private onlineListener: (() => void) | null = null
+	private offlineListener: (() => void) | null = null
 
 	constructor() {
 		this.initializeAutoSync()
@@ -65,18 +68,18 @@ export class DataSyncService {
 	 * 初始化自动同步
 	 */
 	private initializeAutoSync(): void {
-		// 监听网络状态变化
 		if (typeof window !== 'undefined') {
-			window.addEventListener('online', () => {
+			this.onlineListener = () => {
 				this.handleNetworkChange(true)
-			})
-			window.addEventListener('offline', () => {
+			}
+			this.offlineListener = () => {
 				this.handleNetworkChange(false)
-			})
+			}
+			window.addEventListener('online', this.onlineListener)
+			window.addEventListener('offline', this.offlineListener)
 		}
 
-		// 定期同步（每30分钟）
-		setInterval(
+		this.autoSyncInterval = setInterval(
 			() => {
 				if (this.syncStatus === SyncStatus.IDLE && this.isOnline()) {
 					this.performSync(SyncType.INCREMENTAL)
@@ -501,6 +504,22 @@ export class DataSyncService {
 		this.isSyncing = false
 		this.retryCount = 0
 		this.syncQueue = []
+
+		if (this.autoSyncInterval) {
+			clearInterval(this.autoSyncInterval)
+			this.autoSyncInterval = null
+		}
+
+		if (typeof window !== 'undefined') {
+			if (this.onlineListener) {
+				window.removeEventListener('online', this.onlineListener)
+				this.onlineListener = null
+			}
+			if (this.offlineListener) {
+				window.removeEventListener('offline', this.offlineListener)
+				this.offlineListener = null
+			}
+		}
 	}
 
 	/**
