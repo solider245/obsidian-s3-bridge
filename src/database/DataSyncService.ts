@@ -6,7 +6,7 @@
 
 import { supabaseDatabaseManager } from './SupabaseDatabaseManager'
 import { configManager } from '../config/ConfigurationManager'
-import { errorHandler } from '../error/ErrorHandler'
+import { SYNC } from '../constants/defaults'
 
 // 同步状态枚举
 export enum SyncStatus {
@@ -85,7 +85,7 @@ export class DataSyncService {
 					this.performSync(SyncType.INCREMENTAL)
 				}
 			},
-			30 * 60 * 1000
+			SYNC.AUTO_SYNC_INTERVAL_MS
 		)
 	}
 

@@ -1,6 +1,7 @@
 import { App, Setting } from 'obsidian'
 import { t } from '../l10n'
 import { activityLog, Activity } from '../activityLog'
+import { FILE_SIZE } from '../constants/defaults'
 
 export function renderActions(containerEl: HTMLElement) {
 	const keyFmtSetting = new Setting(containerEl)
@@ -53,7 +54,7 @@ function exportLogsToMarkdown(logs: Activity[]) {
 	URL.revokeObjectURL(url)
 }
 
-const LARGE_FILE_THRESHOLD_BYTES = 5 * 1024 * 1024 // 5MB
+const LARGE_FILE_THRESHOLD_BYTES = FILE_SIZE.LARGE_FILE_THRESHOLD
 
 function renderLogEntries(
 	app: App,

@@ -2,6 +2,7 @@ import { Plugin, Notice } from 'obsidian'
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { loadS3Config, buildPublicUrl } from '../../s3/s3Manager'
+import { UPLOAD, TIMEOUTS } from '../constants/defaults'
 
 // 采用 node:https 作为 HTTP 客户端，避免打包器处理 node: 前缀内置模块的问题
 import * as https from 'https'
@@ -72,7 +73,7 @@ export async function getPresignedPutUrl(
 	plugin: Plugin,
 	key: string,
 	contentType: string,
-	expiresInSeconds = 300,
+	expiresInSeconds = UPLOAD.DEFAULT_EXPIRY_SECONDS,
 	timeoutMs?: number
 ): Promise<string> {
 	const { client, bucket } = buildS3Client(plugin)
@@ -88,7 +89,7 @@ export async function getPresignedPutUrl(
 	const to =
 		typeof timeoutMs === 'number' && timeoutMs > 0
 			? Math.floor(timeoutMs)
-			: Math.max(1000, Number((window as any).__obS3_presignTimeout__ ?? 10000))
+			: Math.max(TIMEOUTS.PRESIGN_MIN, Number((window as any).__obS3_presignTimeout__ ?? TIMEOUTS.PRESIGN_DEFAULT))
 
 	// 超时包装
 	const url = await Promise.race([
@@ -247,7 +248,7 @@ export async function testConnectionViaPresign(
 		key,
 		contentType,
 		bodyBase64,
-		expiresInSeconds = 300,
+		expiresInSeconds = UPLOAD.DEFAULT_EXPIRY_SECONDS,
 		presignTimeoutMs,
 		uploadTimeoutMs,
 	} = opts

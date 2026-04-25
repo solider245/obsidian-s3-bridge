@@ -10,6 +10,7 @@ import { presignAndPutObject } from '../uploader/presignPut'
 import { uploadProgressManager } from '../utils/uploadProgress'
 import { buildPublicUrl } from '../../s3/s3Manager'
 import { createMultipartUpload } from '../utils/multipartUpload'
+import { UPLOAD, TIMEOUTS } from '../constants/defaults'
 
 export async function performUpload(
 	plugin: Plugin,
@@ -45,8 +46,8 @@ export async function performUpload(
 		// 更新进度：准备阶段
 		uploadProgressManager.updateProgress(uploadId, 10, 'preparing', 'Preparing upload...')
 
-		// 判断是否需要分片上传（超过 10MB）
-		const USE_MULTIPART_THRESHOLD = 10 * 1024 * 1024 // 10MB
+		// 判断是否需要分片上传
+		const USE_MULTIPART_THRESHOLD = UPLOAD.MULTIPART_THRESHOLD
 
 		let url: string
 		if (fileSize >= USE_MULTIPART_THRESHOLD) {
@@ -63,12 +64,12 @@ export async function performUpload(
 				fileData: base64,
 				fileSize,
 				presignTimeoutMs: Math.max(
-					1000,
-					Number(presignTimeoutMs ?? (window as any).__obS3_presignTimeout__ ?? 10000)
+					TIMEOUTS.PRESIGN_MIN,
+					Number(presignTimeoutMs ?? (window as any).__obS3_presignTimeout__ ?? TIMEOUTS.PRESIGN_DEFAULT)
 				),
 				uploadTimeoutMs: Math.max(
-					1000,
-					Number(uploadTimeoutMs ?? (window as any).__obS3_uploadTimeout__ ?? 25000)
+					TIMEOUTS.UPLOAD_MIN,
+					Number(uploadTimeoutMs ?? (window as any).__obS3_uploadTimeout__ ?? TIMEOUTS.UPLOAD_DEFAULT)
 				),
 				fileName,
 				onProgress: progress => {
@@ -87,12 +88,12 @@ export async function performUpload(
 				contentType: mime || 'application/octet-stream',
 				bodyBase64: base64,
 				presignTimeoutMs: Math.max(
-					1000,
-					Number(presignTimeoutMs ?? (window as any).__obS3_presignTimeout__ ?? 10000)
+					TIMEOUTS.PRESIGN_MIN,
+					Number(presignTimeoutMs ?? (window as any).__obS3_presignTimeout__ ?? TIMEOUTS.PRESIGN_DEFAULT)
 				),
 				uploadTimeoutMs: Math.max(
-					1000,
-					Number(uploadTimeoutMs ?? (window as any).__obS3_uploadTimeout__ ?? 25000)
+					TIMEOUTS.UPLOAD_MIN,
+					Number(uploadTimeoutMs ?? (window as any).__obS3_uploadTimeout__ ?? TIMEOUTS.UPLOAD_DEFAULT)
 				),
 			})
 		}
