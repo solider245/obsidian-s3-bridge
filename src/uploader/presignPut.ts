@@ -81,7 +81,7 @@ export async function putWithHttps(
 	const to =
 		typeof timeoutMs === 'number' && timeoutMs > 0
 			? Math.floor(timeoutMs)
-			: Math.max(1000, Number(window.__obS3_uploadTimeout__ ?? 25000))
+			: Math.max(TIMEOUTS.UPLOAD_MIN, Number(window.__obS3_uploadTimeout__ ?? TIMEOUTS.UPLOAD_DEFAULT))
 
 	await new Promise<void>((resolve, reject) => {
 		let finished = false

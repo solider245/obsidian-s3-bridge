@@ -8,6 +8,7 @@ import { loadS3Config } from '../../s3/s3Manager'
 import { activityLog } from '../activityLog'
 import { generateUploadId } from '../utils/generateUploadId'
 import { getErrorMessage, getErrorType } from '../utils/errorHandling'
+import { stashFailed } from '../retry/retryCache'
 
 export interface PasteCtx {
 	plugin: Plugin
@@ -74,6 +75,7 @@ export function installPasteHandler(ctx: PasteCtx): void {
 				} catch (e: unknown) {
 					const errorMsg = getErrorMessage(e)
 					const errorType = getErrorType(e)
+					stashFailed(uploadId, { key, mime, base64, fileName: file.name })
 					editor.replaceRange(
 						`![${file.name} ob-s3:id=${uploadId} status=failed](#) [Retry](#)`,
 						startPos,

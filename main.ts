@@ -82,8 +82,35 @@ export default class S3BridgePlugin extends Plugin {
 			getExt: getFileExtensionFromMime,
 		})
 
-		const retry = installRetryHandler(this, ({ editor, uploadId }) => {
-			new Notice(tp('Retry not yet implemented for upload: {id}', { id: uploadId }))
+		const retry = installRetryHandler(this, async ({ editor, uploadId }) => {
+			const { getFailed, removeFailed } = await import('./src/retry/retryCache')
+			const { performUpload } = await import('./src/upload/performUpload')
+			const data = getFailed(uploadId)
+			if (!data) {
+				new Notice(t('Retry data expired, please re-paste the file'))
+				return
+			}
+			try {
+				const url = await performUpload(this, {
+					key: data.key,
+					mime: data.mime,
+					base64: data.base64,
+					fileName: data.fileName,
+					uploadId,
+				})
+				const pos = editor.getCursor()
+				const lineText = editor.getLine(pos.line)
+				const escaped = uploadId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+				const re = new RegExp(
+					`!\\[[^\\]]*ob-s3:id=${escaped}\\s+status=failed[^\\]]*\\]\\(#\\)\\s*\\[Retry\\]\\(#\\)`
+				)
+				editor.setLine(pos.line, lineText.replace(re, `![${data.fileName}](${url})`))
+				removeFailed(uploadId)
+				new Notice(tp('Retry successful: {name}', { name: data.fileName }))
+			} catch (e: unknown) {
+				const { getErrorMessage } = await import('./src/utils/errorHandling')
+				new Notice(tp('Retry failed: {error}', { error: getErrorMessage(e) }))
+			}
 		})
 		this.register(() => retry.uninstall())
 	}
