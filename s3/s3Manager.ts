@@ -360,7 +360,7 @@ export function buildPublicUrl(plugin: Plugin, key: string): string {
 	const p = loadActiveProfile(plugin)
 	const bucket = (p.bucketName || '').trim()
 	const prefix = (p.keyPrefix || '').replace(/^\/+|\/+$/g, '')
-	const finalKey = (prefix ? `${prefix}/` : '') + key.replace(/^\/+/, '')
+	const finalKey = key.replace(/^\/+/, '')
 
 	// 优先 baseUrl
 	const base = (p.baseUrl || '').trim()
