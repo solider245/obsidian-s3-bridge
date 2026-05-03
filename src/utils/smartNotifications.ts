@@ -5,6 +5,7 @@
  */
 
 import { enhancedProgressManager, EnhancedProgressUpdate } from './enhancedProgress'
+import { formatSpeed, formatEta, formatFileSize } from './uploadProgress'
 import { configManager } from '../config/ConfigurationManager'
 import { Notice } from 'obsidian'
 
@@ -101,7 +102,7 @@ export class SmartNotificationManager {
 			type: 'info',
 			title: '开始上传',
 			message: `正在上传: ${update.fileName}`,
-			details: `文件大小: ${this.formatSize(update.fileSize)}`,
+			details: `文件大小: ${formatFileSize(update.fileSize)}`,
 			timestamp: Date.now(),
 			dismissible: true,
 			config,
@@ -136,7 +137,7 @@ export class SmartNotificationManager {
 			type: 'info',
 			title: '上传进度',
 			message: `${update.fileName}: ${update.progress.toFixed(1)}%`,
-			details: `速度: ${this.formatSpeed(update.speed)} - 剩余: ${this.formatTime(update.eta)}`,
+			details: `速度: ${formatSpeed(update.speed)} - 剩余: ${formatEta(update.eta)}`,
 			timestamp: Date.now(),
 			progress: update.progress,
 			dismissible: true,
@@ -158,7 +159,7 @@ export class SmartNotificationManager {
 			type: 'success',
 			title: '上传完成',
 			message: `${update.fileName} 上传完成`,
-			details: `耗时: ${this.formatTime(update.timeElapsed)} - 平均速度: ${this.formatSpeed(update.averageSpeed)}`,
+			details: `耗时: ${formatEta(update.timeElapsed)} - 平均速度: ${formatSpeed(update.averageSpeed)}`,
 			timestamp: Date.now(),
 			dismissible: true,
 			config,
@@ -212,7 +213,7 @@ export class SmartNotificationManager {
 			type: 'warning',
 			title: '上传已暂停',
 			message: `${update.fileName} 上传已暂停`,
-			details: `进度: ${update.progress.toFixed(1)}% - 已上传: ${this.formatSize(update.uploadedBytes)}`,
+			details: `进度: ${update.progress.toFixed(1)}% - 已上传: ${formatFileSize(update.uploadedBytes)}`,
 			timestamp: Date.now(),
 			dismissible: true,
 			config,
@@ -415,39 +416,13 @@ export class SmartNotificationManager {
 错误: ${update.error}
 重试次数: ${update.retryCount}
 上传进度: ${update.progress.toFixed(1)}%
-已上传: ${this.formatSize(update.uploadedBytes)}
-总大小: ${this.formatSize(update.fileSize)}
+已上传: ${formatFileSize(update.uploadedBytes)}
+总大小: ${formatFileSize(update.fileSize)}
     `.trim()
 
 		new Notice(details, 10000)
 	}
 
-	/**
-	 * 格式化文件大小
-	 */
-	private formatSize(bytes: number): string {
-		if (bytes === 0) return '0 B'
-		const k = 1024
-		const sizes = ['B', 'KB', 'MB', 'GB']
-		const i = Math.floor(Math.log(bytes) / Math.log(k))
-		return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-	}
-
-	/**
-	 * 格式化时间
-	 */
-	private formatTime(seconds: number): string {
-		if (seconds < 60) return `${Math.round(seconds)}秒`
-		if (seconds < 3600) return `${Math.round(seconds / 60)}分钟`
-		return `${Math.round(seconds / 3600)}小时`
-	}
-
-	/**
-	 * 格式化速度
-	 */
-	private formatSpeed(bytesPerSecond: number): string {
-		return `${this.formatSize(bytesPerSecond)}/s`
-	}
 
 	/**
 	 * 获取活跃通知

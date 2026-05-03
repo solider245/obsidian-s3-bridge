@@ -5,6 +5,7 @@
  */
 
 import { configManager } from '../config/ConfigurationManager'
+import { formatSpeed, formatEta, formatFileSize } from './uploadProgress'
 import { Notice } from 'obsidian'
 
 export interface EnhancedProgressUpdate {
@@ -364,8 +365,8 @@ export class EnhancedProgressManager {
 		if (progress === 0) return '准备上传...'
 		if (progress === 100) return '上传完成'
 
-		const speedText = this.formatSpeed(speed)
-		const etaText = this.formatTime(eta)
+		const speedText = formatSpeed(speed)
+		const etaText = formatEta(eta)
 
 		return `${fileName} - ${progress.toFixed(1)}% - ${speedText} - 剩余 ${etaText}`
 	}
@@ -410,7 +411,7 @@ export class EnhancedProgressManager {
 				break
 			case 'complete':
 				if (!this.notificationOptions.showCompletionAlerts) return
-				const timeText = this.formatTime(update.timeElapsed)
+				const timeText = formatEta(update.timeElapsed)
 				message =
 					this.notificationOptions.customMessages?.complete ||
 					`上传完成: ${update.fileName} (${timeText})`
@@ -442,32 +443,6 @@ export class EnhancedProgressManager {
 		})
 	}
 
-	/**
-	 * 格式化文件大小
-	 */
-	private formatSize(bytes: number): string {
-		if (bytes === 0) return '0 B'
-		const k = 1024
-		const sizes = ['B', 'KB', 'MB', 'GB']
-		const i = Math.floor(Math.log(bytes) / Math.log(k))
-		return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-	}
-
-	/**
-	 * 格式化时间
-	 */
-	private formatTime(seconds: number): string {
-		if (seconds < 60) return `${Math.round(seconds)}秒`
-		if (seconds < 3600) return `${Math.round(seconds / 60)}分钟`
-		return `${Math.round(seconds / 3600)}小时`
-	}
-
-	/**
-	 * 格式化速度
-	 */
-	private formatSpeed(bytesPerSecond: number): string {
-		return `${this.formatSize(bytesPerSecond)}/s`
-	}
 }
 
 // 全局实例

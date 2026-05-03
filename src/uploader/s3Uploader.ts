@@ -1,6 +1,6 @@
 import { Plugin, Notice } from 'obsidian'
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
-import { loadS3Config } from '../../s3/s3Manager'
+import { PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
+import { loadS3Config, buildS3Client } from '../../s3/s3Manager'
 
 // 掩码工具：对敏感信息做最小化脱敏
 function maskAccessKey(id: string | undefined) {
@@ -139,16 +139,7 @@ export async function testConnection(
 		/* ignore logging errors */
 	}
 
-	const client = new S3Client({
-		endpoint,
-		region,
-		forcePathStyle: true,
-		credentials: {
-			accessKeyId: cfg.accessKeyId,
-			secretAccessKey: cfg.secretAccessKey,
-		},
-		tls: cfg.useSSL,
-	})
+	const { client } = buildS3Client(plugin)
 
 	const body = Buffer.from(opts.bodyBase64, 'base64')
 

@@ -28,6 +28,12 @@ vi.mock('../../s3/s3Manager', () => ({
 		cacheControl: 'public, max-age=31536000',
 	})),
 	buildPublicUrl: vi.fn(() => 'https://example.com/test.jpg'),
+	buildS3Client: vi.fn(() => ({
+		client: { send: vi.fn() },
+		bucket: 'test-bucket',
+		endpoint: 'https://s3.amazonaws.com',
+		region: 'us-east-1',
+	})),
 }))
 
 vi.mock('../../src/utils/uploadProgress', () => ({

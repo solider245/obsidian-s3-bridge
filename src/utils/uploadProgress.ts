@@ -12,6 +12,7 @@ export interface ProgressUpdate {
 	uploadedBytes?: number
 	speed?: number // bytes per second
 	eta?: number // estimated time to completion in seconds
+	lastUpdate?: number // timestamp of last progress update
 }
 
 export interface UploadProgressOptions {
@@ -27,9 +28,25 @@ export class UploadProgressManager {
 	private listeners = new Set<(update: ProgressUpdate) => void>()
 
 	/**
+	 * 清理超过30分钟的过期上传记录，防止内存泄漏
+	 */
+	private cleanupStale(): void {
+		const CUTOFF = 30 * 60 * 1000 // 30 minutes
+		const now = Date.now()
+		for (const [id, entry] of this.uploads) {
+			if (entry.lastUpdate == null) continue
+			if (now - entry.lastUpdate > CUTOFF) {
+				this.uploads.delete(id)
+			}
+		}
+	}
+
+	/**
 	 * 开始一个新的上传任务
 	 */
 	startUpload(id: string, options: UploadProgressOptions = {}): ProgressUpdate {
+		this.cleanupStale()
+
 		const update: ProgressUpdate = {
 			id,
 			progress: 0,
@@ -63,7 +80,7 @@ export class UploadProgressManager {
 		let speed: number | undefined
 		let eta: number | undefined
 		if (update.uploadedBytes !== undefined && update.uploadedBytes > 0) {
-			const timeDiff = (now - (update as any).lastUpdate || now) / 1000
+			const timeDiff = (now - (update.lastUpdate || now)) / 1000
 			const bytesDiff = uploadedBytes - update.uploadedBytes
 			if (timeDiff > 0 && bytesDiff > 0) {
 				speed = bytesDiff / timeDiff
@@ -80,7 +97,7 @@ export class UploadProgressManager {
 		update.uploadedBytes = uploadedBytes
 		update.speed = speed
 		update.eta = eta
-		;(update as any).lastUpdate = now
+		update.lastUpdate = now
 
 		this.notifyListeners(update)
 	}

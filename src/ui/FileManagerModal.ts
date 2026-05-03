@@ -8,6 +8,7 @@ import { supabaseDatabaseManager } from '../database/SupabaseDatabaseManager'
 import { dataSyncService, SyncStatus, SyncType } from '../database/DataSyncService'
 import { configManager } from '../config/ConfigurationManager'
 import { Modal, App, Setting, TextComponent, ButtonComponent, DropdownComponent } from 'obsidian'
+import { formatFileSize } from '../utils/uploadProgress'
 
 // 文件项接口
 interface FileItem {
@@ -366,7 +367,7 @@ export class FileManagerModal extends Modal {
             </div>
             <div class="file-manager-stat">
                 <span class="file-manager-stat-label">总大小:</span>
-                <span class="file-manager-stat-value">${this.formatFileSize(totalSize)}</span>
+                <span class="file-manager-stat-value">${formatFileSize(totalSize)}</span>
             </div>
             <div class="file-manager-stat">
                 <span class="file-manager-stat-label">已完成:</span>
@@ -444,7 +445,7 @@ export class FileManagerModal extends Modal {
 
 		const fileInfoMeta = fileDetails.createDiv({ cls: 'file-manager-item-meta' })
 		fileInfoMeta.innerHTML = `
-            <span class="file-manager-item-size">${this.formatFileSize(file.fileSize)}</span>
+            <span class="file-manager-item-size">${formatFileSize(file.fileSize)}</span>
             <span class="file-manager-item-type">${this.getMimeTypeText(file.mimeType)}</span>
             <span class="file-manager-item-date">${this.formatDate(file.createdAt)}</span>
         `
@@ -746,15 +747,6 @@ export class FileManagerModal extends Modal {
 		return csvContent
 	}
 
-	// 工具方法
-
-	private formatFileSize(bytes: number): string {
-		if (bytes === 0) return '0 B'
-		const k = 1024
-		const sizes = ['B', 'KB', 'MB', 'GB']
-		const i = Math.floor(Math.log(bytes) / Math.log(k))
-		return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-	}
 
 	private getMimeTypeText(mimeType: string): string {
 		if (mimeType.startsWith('image/')) return '图片'

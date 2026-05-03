@@ -17,11 +17,14 @@ export async function ensureWithinLimitOrConfirm(
 
 	if (bytes > limit) {
 		const overMB = (bytes / (1024 * 1024)).toFixed(2)
-		const thresholdMB = Math.floor(limit / (1024 * 1024))
+		const thresholdMB = limit / (1024 * 1024)
+		const thresholdDisplay = thresholdMB >= 1
+			? thresholdMB.toFixed(0) + 'MB'
+			: Math.round(limit / 1024) + 'KB'
 		const confirmed = window.confirm(
-			t('File exceeds {mb}MB (current limit: {limit}MB). Continue upload?')
+			t('File exceeds {mb}MB (current limit: {limit}). Continue upload?')
 				.replace('{mb}', String(overMB))
-				.replace('{limit}', String(thresholdMB))
+				.replace('{limit}', thresholdDisplay)
 		)
 		return !!confirmed
 	}

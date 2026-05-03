@@ -1,75 +1,11 @@
 import { Plugin } from 'obsidian'
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
+import { PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
-import { loadS3Config, buildPublicUrl } from '../../s3/s3Manager'
+import { loadS3Config, buildPublicUrl, buildS3Client } from '../../s3/s3Manager'
 import { UPLOAD, TIMEOUTS } from '../constants/defaults'
 
-// 采用 node:https 作为 HTTP 客户端，避免打包器处理 node: 前缀内置模块的问题
 import * as https from 'https'
 import { URL } from 'url'
-
-/**
- * 规范化与校验 R2 端点：
- * - 去尾部斜杠
- * - 允许通用 S3 端点；若为 R2，建议使用 ACCOUNT_ID.r2.cloudflarestorage.com
- * - 不允许带有路径段（bucket 不能出现在 endpoint 中）
- */
-function normalizeAndValidateEndpoint(endpoint: string): string {
-	const ep = (endpoint || '').trim().replace(/\/+$/, '')
-	if (!/^https?:\/\//i.test(ep)) {
-		throw new Error('Invalid endpoint: must start with http(s)://')
-	}
-	const u = new URL(ep)
-	if (u.pathname && u.pathname !== '/') {
-		throw new Error('Invalid endpoint: do not include bucket path in endpoint')
-	}
-	return ep
-}
-
-/**
- * 基于配置构建 Node 侧 S3Client
- * - forcePathStyle: true 以兼容 R2
- * - region 默认 us-east-1
- * - tls 由配置控制
- * - 使用缓存避免重复创建客户端
- */
-let cachedClient: { client: S3Client; bucket: string; endpoint: string; region: string; configHash: string } | null = null
-
-function buildS3Client(plugin: Plugin): {
-	client: S3Client
-	bucket: string
-	endpoint: string
-	region: string
-} {
-	const cfg = loadS3Config(plugin)
-	if (!cfg.endpoint || !cfg.accessKeyId || !cfg.secretAccessKey || !cfg.bucketName) {
-		throw new Error(
-			'S3 settings incomplete: endpoint/accessKeyId/secretAccessKey/bucketName are required'
-		)
-	}
-
-	const configHash = `${cfg.endpoint}|${cfg.accessKeyId}|${cfg.secretAccessKey}|${cfg.bucketName}|${cfg.region || ''}|${cfg.useSSL}`
-	if (cachedClient?.configHash === configHash) {
-		return cachedClient
-	}
-
-	const endpoint = normalizeAndValidateEndpoint(cfg.endpoint)
-	const region = cfg.region && cfg.region.trim() ? cfg.region.trim() : 'us-east-1'
-
-	const client = new S3Client({
-		endpoint,
-		region,
-		forcePathStyle: true,
-		credentials: {
-			accessKeyId: cfg.accessKeyId,
-			secretAccessKey: cfg.secretAccessKey,
-		},
-		tls: cfg.useSSL,
-	})
-
-	cachedClient = { client, bucket: cfg.bucketName, endpoint, region, configHash }
-	return { client, bucket: cfg.bucketName, endpoint, region }
-}
 
 /**
  * 生成预签名 PUT URL（带超时）
@@ -268,16 +204,22 @@ export async function testConnectionViaPresign(
 	} = opts
 
 	// 预签名并上传（丢弃返回的公开链接，不在测试里访问）
-	await presignAndPutObject(plugin, {
-		key,
-		contentType,
-		bodyBase64,
-		expiresInSeconds,
-		presignTimeoutMs,
-		uploadTimeoutMs,
-	})
-
-	// 清理对象
-	const { client, bucket } = buildS3Client(plugin)
-	await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }))
+	try {
+		await presignAndPutObject(plugin, {
+			key,
+			contentType,
+			bodyBase64,
+			expiresInSeconds,
+			presignTimeoutMs,
+			uploadTimeoutMs,
+		})
+	} finally {
+		// 清理对象
+		const { client, bucket } = buildS3Client(plugin)
+		try {
+			await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }))
+		} catch {
+			// test object may not have been created, ignore
+		}
+	}
 }

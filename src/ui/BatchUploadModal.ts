@@ -8,6 +8,7 @@ import { BatchUploader, UploadItem, BatchProgress } from '../upload/BatchUploade
 import { configManager } from '../config/ConfigurationManager'
 import { enhancedProgressManager, EnhancedProgressUpdate } from '../utils/enhancedProgress'
 import { smartNotificationManager } from '../utils/smartNotifications'
+import { formatSpeed, formatEta, formatFileSize } from '../utils/uploadProgress'
 import { Notice, Modal, App } from 'obsidian'
 
 export class BatchUploadModal extends Modal {
@@ -313,7 +314,7 @@ export class BatchUploadModal extends Modal {
 		if (speedText) {
 			const speedTextContent =
 				progress.speed > 0
-					? `${this.formatSpeed(progress.speed)} - ${this.formatTime(progress.eta)}`
+					? `${formatSpeed(progress.speed)} - ${formatEta(progress.eta)}`
 					: '准备中...'
 			speedText.textContent = speedTextContent
 		}
@@ -348,7 +349,7 @@ export class BatchUploadModal extends Modal {
 			fileInfo.createDiv({ cls: 'batch-upload-item-name', text: item.metadata.name })
 			fileInfo.createDiv({
 				cls: 'batch-upload-item-size',
-				text: this.formatSize(item.metadata.size),
+				text: formatFileSize(item.metadata.size),
 			})
 
 			// 增强的进度信息
@@ -448,7 +449,7 @@ export class BatchUploadModal extends Modal {
 		if (totalFilesEl) totalFilesEl.textContent = progress.total.toString()
 		if (completedFilesEl) completedFilesEl.textContent = progress.completed.toString()
 		if (failedFilesEl) failedFilesEl.textContent = progress.failed.toString()
-		if (totalSizeEl) totalSizeEl.textContent = this.formatSize(progress.totalSize)
+		if (totalSizeEl) totalSizeEl.textContent = formatFileSize(progress.totalSize)
 	}
 
 	/**
@@ -475,33 +476,6 @@ export class BatchUploadModal extends Modal {
 	private onItemComplete(item: UploadItem): void {
 		this.updateItemsList()
 		this.updateControlButtons()
-	}
-
-	/**
-	 * 格式化文件大小
-	 */
-	private formatSize(bytes: number): string {
-		if (bytes === 0) return '0 B'
-		const k = 1024
-		const sizes = ['B', 'KB', 'MB', 'GB']
-		const i = Math.floor(Math.log(bytes) / Math.log(k))
-		return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-	}
-
-	/**
-	 * 格式化速度
-	 */
-	private formatSpeed(bytesPerSecond: number): string {
-		return this.formatSize(bytesPerSecond) + '/s'
-	}
-
-	/**
-	 * 格式化时间
-	 */
-	private formatTime(seconds: number): string {
-		if (seconds < 60) return `${Math.round(seconds)}秒`
-		if (seconds < 3600) return `${Math.round(seconds / 60)}分钟`
-		return `${Math.round(seconds / 3600)}小时`
 	}
 
 	/**
@@ -673,19 +647,19 @@ export class BatchUploadModal extends Modal {
 		) as HTMLElement
 
 		if (currentSpeedEl) {
-			currentSpeedEl.textContent = this.formatSpeed(update.speed)
+			currentSpeedEl.textContent = formatSpeed(update.speed)
 		}
 
 		if (averageSpeedEl) {
-			averageSpeedEl.textContent = this.formatSpeed(update.averageSpeed)
+			averageSpeedEl.textContent = formatSpeed(update.averageSpeed)
 		}
 
 		if (peakSpeedEl) {
-			peakSpeedEl.textContent = this.formatSpeed(update.peakSpeed)
+			peakSpeedEl.textContent = formatSpeed(update.peakSpeed)
 		}
 
 		if (totalTimeEl) {
-			totalTimeEl.textContent = this.formatTime(update.timeElapsed)
+			totalTimeEl.textContent = formatEta(update.timeElapsed)
 		}
 	}
 
@@ -718,13 +692,13 @@ export class BatchUploadModal extends Modal {
 		// 更新速度信息
 		const speedEl = itemEl.querySelector('.batch-upload-item-speed') as HTMLElement
 		if (speedEl) {
-			speedEl.textContent = this.formatSpeed(update.speed)
+			speedEl.textContent = formatSpeed(update.speed)
 		}
 
 		// 更新ETA信息
 		const etaEl = itemEl.querySelector('.batch-upload-item-eta') as HTMLElement
 		if (etaEl) {
-			etaEl.textContent = this.formatTime(update.eta)
+			etaEl.textContent = formatEta(update.eta)
 		}
 
 		// 更新警告信息

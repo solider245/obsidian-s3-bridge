@@ -1,6 +1,8 @@
 import { Plugin, Notice } from 'obsidian'
+import { S3Client } from '@aws-sdk/client-s3'
 import * as fs from 'fs'
 import * as path from 'path'
+import { URL } from 'url'
 import { configCache } from '../src/utils/configCache'
 
 /**
@@ -50,6 +52,70 @@ export interface S3ProfilesFile {
 /**
  * 插件配置目录与文件路径
  */
+
+/**
+ * 规范化与校验端点：
+ * - 去尾部斜杠
+ * - 允许通用 S3 端点；若为 R2，建议使用 ACCOUNT_ID.r2.cloudflarestorage.com
+ * - 不允许带有路径段（bucket 不能出现在 endpoint 中）
+ */
+export function normalizeAndValidateEndpoint(endpoint: string): string {
+	const ep = (endpoint || '').trim().replace(/\/+$/, '')
+	if (!/^https?:\/\//i.test(ep)) {
+		throw new Error('Invalid endpoint: must start with http(s)://')
+	}
+	const u = new URL(ep)
+	if (u.pathname && u.pathname !== '/') {
+		throw new Error('Invalid endpoint: do not include bucket path in endpoint')
+	}
+	return ep
+}
+
+/**
+ * 基于配置构建 Node 侧 S3Client
+ * - forcePathStyle: true 以兼容 R2
+ * - region 默认 us-east-1
+ * - tls 由配置控制
+ * - 使用缓存避免重复创建客户端
+ */
+let cachedClient: { client: S3Client; bucket: string; endpoint: string; region: string; configHash: string } | null = null
+
+export function buildS3Client(plugin: Plugin): {
+	client: S3Client
+	bucket: string
+	endpoint: string
+	region: string
+} {
+	const cfg = loadS3Config(plugin)
+	if (!cfg.endpoint || !cfg.accessKeyId || !cfg.secretAccessKey || !cfg.bucketName) {
+		throw new Error(
+			'S3 settings incomplete: endpoint/accessKeyId/secretAccessKey/bucketName are required'
+		)
+	}
+
+	const configHash = `${cfg.endpoint}|${cfg.accessKeyId}|${cfg.secretAccessKey}|${cfg.bucketName}|${cfg.region || ''}|${cfg.useSSL}`
+	if (cachedClient?.configHash === configHash) {
+		return cachedClient
+	}
+
+	const endpoint = normalizeAndValidateEndpoint(cfg.endpoint)
+	const region = cfg.region && cfg.region.trim() ? cfg.region.trim() : 'us-east-1'
+
+	const client = new S3Client({
+		endpoint,
+		region,
+		forcePathStyle: true,
+		credentials: {
+			accessKeyId: cfg.accessKeyId,
+			secretAccessKey: cfg.secretAccessKey,
+		},
+		tls: cfg.useSSL,
+	})
+
+	cachedClient = { client, bucket: cfg.bucketName, endpoint, region, configHash }
+	return { client, bucket: cfg.bucketName, endpoint, region }
+}
+
 function getPluginFolder(plugin: Plugin): string {
 	return `${plugin.app.vault.configDir}/plugins/${plugin.manifest.id}`
 }

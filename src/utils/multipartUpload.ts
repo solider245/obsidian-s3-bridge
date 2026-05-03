@@ -4,15 +4,16 @@
 
 import { Plugin, Notice } from 'obsidian'
 import {
-	S3Client,
 	CreateMultipartUploadCommand,
 	UploadPartCommand,
 	CompleteMultipartUploadCommand,
 	AbortMultipartUploadCommand,
 } from '@aws-sdk/client-s3'
+import type { S3Client } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
-import { loadS3Config, buildPublicUrl } from '../../s3/s3Manager'
+import { loadS3Config, buildPublicUrl, buildS3Client } from '../../s3/s3Manager'
 import { uploadProgressManager } from './uploadProgress'
+import { UPLOAD } from '../constants/defaults'
 
 export interface MultipartUploadOptions {
 	key: string
@@ -63,22 +64,9 @@ export class MultipartUploadManager {
 		this.maxConcurrent = this.options.maxConcurrent!
 
 		// 构建 S3 客户端
-		const cfg = loadS3Config(plugin)
-		if (!cfg.endpoint || !cfg.accessKeyId || !cfg.secretAccessKey || !cfg.bucketName) {
-			throw new Error('S3 settings incomplete')
-		}
-
-		this.client = new S3Client({
-			endpoint: cfg.endpoint,
-			region: cfg.region || 'us-east-1',
-			forcePathStyle: true,
-			credentials: {
-				accessKeyId: cfg.accessKeyId,
-				secretAccessKey: cfg.secretAccessKey,
-			},
-			tls: cfg.useSSL,
-		})
-		this.bucket = cfg.bucketName
+		const { client, bucket } = buildS3Client(plugin)
+		this.client = client
+		this.bucket = bucket
 
 		// 计算分片
 		this.calculateParts()
@@ -150,7 +138,7 @@ export class MultipartUploadManager {
 		}
 	}
 
-	private async uploadParts(uploadId: string): Promise<void> {
+	private async uploadParts(trackingId: string): Promise<void> {
 		const uploadPromises: Promise<void>[] = []
 
 		for (const part of this.parts) {
@@ -164,7 +152,7 @@ export class MultipartUploadManager {
 			if (this.aborted) break
 
 			this.activeUploads++
-			const promise = this.uploadPart(uploadId, part).finally(() => {
+			const promise = this.uploadPart(trackingId, part).finally(() => {
 				this.activeUploads--
 			})
 
@@ -174,7 +162,7 @@ export class MultipartUploadManager {
 		await Promise.all(uploadPromises)
 	}
 
-	private async uploadPart(uploadId: string, part: UploadPart): Promise<void> {
+	private async uploadPart(trackingId: string, part: UploadPart): Promise<void> {
 		if (this.aborted) return
 
 		part.status = 'uploading'
@@ -214,7 +202,7 @@ export class MultipartUploadManager {
 			})
 
 			// 更新进度
-			this.updateUploadProgress(uploadId)
+			this.updateUploadProgress(trackingId)
 		} catch (error) {
 			part.status = 'failed'
 			part.retryCount++
@@ -223,7 +211,7 @@ export class MultipartUploadManager {
 				// 指数退避重试
 				const delay = Math.min(30000, 1000 * Math.pow(2, part.retryCount)) // 最大30秒
 				await new Promise(resolve => setTimeout(resolve, delay))
-				await this.uploadPart(uploadId, part)
+				await this.uploadPart(trackingId, part)
 			} else {
 				throw new Error(
 					`Failed to upload part ${part.partNumber} after ${part.retryCount} attempts: ${(error as Error).message}`
@@ -260,14 +248,14 @@ export class MultipartUploadManager {
 	}
 
 	// 更新上传进度
-	private updateUploadProgress(uploadId: string): void {
+	private updateUploadProgress(trackingId: string): void {
 		const uploadedSize = this.completedParts.reduce((sum, p) => {
 			return sum + (this.partsSizeCache.get(p.PartNumber) || 0)
 		}, 0)
 		const progress = Math.floor((uploadedSize / this.options.fileSize) * 80) + 10 // 10-90%
 
 		uploadProgressManager.updateProgress(
-			uploadId,
+			trackingId,
 			progress,
 			'uploading',
 			`Uploading ${this.completedParts.length}/${this.parts.length} parts...`
@@ -442,10 +430,9 @@ export async function createMultipartUpload(
 		throw new Error('Either fileSize, fileData, or filePath must be provided')
 	}
 
-	// 判断是否需要分片上传（超过 10MB）
-	const USE_MULTIPART_THRESHOLD = 10 * 1024 * 1024 // 10MB
+	// 判断是否需要分片上传（使用统一常量）
 
-	if (fileSize < USE_MULTIPART_THRESHOLD) {
+	if (fileSize < UPLOAD.MULTIPART_THRESHOLD) {
 		// 小文件使用普通上传
 		const { presignAndPutObject } = await import('../uploader/presignPut')
 		let bodyBase64: string
