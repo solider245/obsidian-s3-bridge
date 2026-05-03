@@ -3,35 +3,6 @@ import { t } from '../l10n'
 import { activityLog, Activity } from '../activityLog'
 import { FILE_SIZE } from '../constants/defaults'
 
-export function renderActions(containerEl: HTMLElement) {
-	const keyFmtSetting = new Setting(containerEl)
-		.setName(t('Object Key Prefix Format'))
-		.setDesc(
-			t(
-				'Use placeholders {yyyy}/{mm}/{dd}. Example: {yyyy}/{mm}. Leave empty to disable date folders.'
-			)
-		)
-	keyFmtSetting.addText(tx => {
-		let current = '{yyyy}/{mm}'
-		try {
-			const raw = localStorage.getItem('obS3Uploader.keyPrefixFormat')
-			if (raw) current = JSON.parse(raw) || current
-		} catch {
-			/* ignore */
-		}
-		tx.setPlaceholder('{yyyy}/{mm}')
-			.setValue(current)
-			.onChange(v => {
-				try {
-					localStorage.setItem('obS3Uploader.keyPrefixFormat', JSON.stringify((v ?? '').trim()))
-					;(window as any).__obS3_keyPrefixFormat__ = (v ?? '').trim()
-				} catch {
-					/* ignore */
-				}
-			})
-	})
-}
-
 function exportLogsToMarkdown(logs: Activity[]) {
 	const headers = [t('Timestamp'), t('Event'), t('Details')]
 	const body = logs
