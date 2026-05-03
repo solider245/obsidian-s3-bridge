@@ -120,9 +120,18 @@ export async function putWithHttps(
 	presignedUrl: string,
 	body: Uint8Array,
 	contentType: string,
-	timeoutMs?: number
+	timeoutMs?: number,
+	cacheControl?: string
 ): Promise<void> {
 	const url = new URL(presignedUrl)
+
+	const headers: Record<string, string> = {
+		'Content-Type': contentType || 'application/octet-stream',
+		'Content-Length': String(body.byteLength),
+	}
+	if (cacheControl) {
+		headers['Cache-Control'] = cacheControl
+	}
 
 	const options: https.RequestOptions = {
 		method: 'PUT',
@@ -130,10 +139,7 @@ export async function putWithHttps(
 		hostname: url.hostname,
 		port: url.port || (url.protocol === 'https:' ? 443 : 80),
 		path: url.pathname + url.search,
-		headers: {
-			'Content-Type': contentType || 'application/octet-stream',
-			'Content-Length': String(body.byteLength),
-		},
+		headers,
 	}
 
 	const to =
@@ -227,9 +233,10 @@ export async function presignAndPutObject(
 		uploadTimeoutMs,
 	} = opts
 
+	const cacheControl = loadS3Config(plugin).cacheControl
 	const url = await getPresignedPutUrl(plugin, key, contentType, expiresInSeconds, presignTimeoutMs)
 	const body = Buffer.from(bodyBase64, 'base64')
-	await putWithHttps(url, body, contentType, uploadTimeoutMs)
+	await putWithHttps(url, body, contentType, uploadTimeoutMs, cacheControl)
 
 	// 生成最终公开链接
 	const publicUrl = buildPublicUrl(plugin, key)
