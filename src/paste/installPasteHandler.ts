@@ -35,7 +35,9 @@ export function installPasteHandler(ctx: PasteCtx): void {
 				evt.preventDefault()
 
 				const placeholder = `![Uploading ${file.name}...]()`
+				const startPos = editor.getCursor()
 				editor.replaceSelection(placeholder)
+				const endPos = editor.getCursor()
 
 				const arrayBuffer = await file.arrayBuffer()
 				const base64 = Buffer.from(arrayBuffer).toString('base64')
@@ -54,11 +56,16 @@ export function installPasteHandler(ctx: PasteCtx): void {
 						mime,
 						base64,
 						fileName: file.name,
+						uploadId,
 					})
 				} catch (e: unknown) {
 					const errorMsg = getErrorMessage(e)
 					const errorType = getErrorType(e)
-					editor.replaceSelection(`![Upload Failed: ${file.name}]()`)
+					editor.replaceRange(
+						`![${file.name} ob-s3:id=${uploadId} status=failed](#) [Retry](#)`,
+						startPos,
+						endPos
+					)
 					new Notice(tp('Upload failed: {error}', { error: errorMsg }))
 					await activityLog.add(plugin.app, 'upload_error', {
 						error: errorMsg,
@@ -70,14 +77,10 @@ export function installPasteHandler(ctx: PasteCtx): void {
 				}
 
 				const markdownLink = `![${file.name}](${finalUrl})`
-
-				// 替换占位符
-				const text = editor.getValue()
-				const newText = text.replace(placeholder, markdownLink)
-				if (text !== newText) {
-					editor.setValue(newText)
+				const currentText = editor.getRange(startPos, endPos)
+				if (currentText === placeholder) {
+					editor.replaceRange(markdownLink, startPos, endPos)
 				} else {
-					// 如果找不到占位符，就在当前位置插入
 					editor.replaceSelection(markdownLink)
 				}
 

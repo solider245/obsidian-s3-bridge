@@ -10,6 +10,7 @@ import { presignAndPutObject } from '../uploader/presignPut'
 import { uploadProgressManager } from '../utils/uploadProgress'
 import { createMultipartUpload } from '../utils/multipartUpload'
 import { UPLOAD, TIMEOUTS } from '../constants/defaults'
+import { nowMs } from '../utils/nowMs'
 
 export async function performUpload(
 	plugin: Plugin,
@@ -20,6 +21,7 @@ export async function performUpload(
 		presignTimeoutMs?: number
 		uploadTimeoutMs?: number
 		fileName?: string
+		uploadId?: string
 	}
 ): Promise<string> {
 	const { key, mime, base64, presignTimeoutMs, uploadTimeoutMs, fileName } = args
@@ -27,8 +29,8 @@ export async function performUpload(
 	// 计算文件大小
 	const fileSize = Math.floor((base64.length * 3) / 4)
 
-	// 生成唯一的上传ID
-	const uploadId = `upload_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`
+	// 复用调用方的 uploadId，或者自生成一个
+	const uploadId = args.uploadId ?? `upload_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`
 
 	// 开始进度跟踪
 	uploadProgressManager.startUpload(uploadId, {
@@ -36,10 +38,7 @@ export async function performUpload(
 		fileSize,
 	})
 
-	const t0 =
-		typeof performance !== 'undefined' && (performance as any).now
-			? (performance as any).now()
-			: Date.now()
+	const t0 = nowMs()
 
 	try {
 		// 更新进度：准备阶段
@@ -97,11 +96,7 @@ export async function performUpload(
 			})
 		}
 
-		const t1 =
-			typeof performance !== 'undefined' && (performance as any).now
-				? (performance as any).now()
-				: Date.now()
-		const sec = Math.max(0, (t1 - t0) / 1000)
+		const sec = Math.max(0, (nowMs() - t0) / 1000)
 		try {
 			console.info('[ob-s3-gemini] upload success', { key, durationSec: Number(sec.toFixed(3)) })
 		} catch {}
@@ -114,11 +109,7 @@ export async function performUpload(
 
 		return url
 	} catch (e) {
-		const t1 =
-			typeof performance !== 'undefined' && (performance as any).now
-				? (performance as any).now()
-				: Date.now()
-		const sec = Math.max(0, (t1 - t0) / 1000)
+		const sec = Math.max(0, (nowMs() - t0) / 1000)
 		const errorMsg = (e as any)?.message ?? String(e)
 		try {
 			console.error('[ob-s3-gemini] upload failed', {

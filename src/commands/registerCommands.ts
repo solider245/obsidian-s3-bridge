@@ -69,11 +69,11 @@ export function registerCommands(ctx: RegisterCtx) {
 				const mime = choice.type || 'application/octet-stream'
 				const ext = getExt(mime)
 				const cfgNow = loadS3Config(plugin)
-				const keyPrefix = (cfgNow.keyPrefix || '').replace(/^\/+|\/+$/g, '')
+				const keyPrefix = cfgNow.keyPrefix || ''
 				const uploadId = generateUploadId()
 				const key = makeObjectKey(choice.name || 'clipboard-upload', ext, keyPrefix, uploadId)
 
-				const url = await performUpload(plugin, { key, mime, base64, fileName: choice.name })
+				const url = await performUpload(plugin, { key, mime, base64, fileName: choice.name, uploadId })
 
 				const view = plugin.app.workspace.getActiveViewOfType(MarkdownView)
 				if (view) {
@@ -117,7 +117,7 @@ export function registerCommands(ctx: RegisterCtx) {
 
 				const ext = getExt(clip.mime)
 				const cfgNow = loadS3Config(plugin)
-				const keyPrefix = (cfgNow.keyPrefix || '').replace(/^\/+|\/+$/g, '')
+				const keyPrefix = cfgNow.keyPrefix || ''
 				const uploadId = generateUploadId()
 				const key = makeObjectKey('clipboard-upload', ext, keyPrefix, uploadId)
 
@@ -126,6 +126,7 @@ export function registerCommands(ctx: RegisterCtx) {
 					mime: clip.mime || 'application/octet-stream',
 					base64: clip.base64,
 					fileName: 'clipboard-image',
+					uploadId,
 				})
 
 				const md = `![](${url})`

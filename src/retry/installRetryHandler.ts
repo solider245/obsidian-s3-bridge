@@ -27,8 +27,6 @@ export function installRetryHandler(
 			const editor: Editor = view.editor
 			if (!editor) return
 
-			evt.preventDefault()
-			evt.stopPropagation()
 
 			setTimeout(() => {
 				try {
@@ -40,6 +38,9 @@ export function installRetryHandler(
 					if (!m) return
 					const uploadId = m[1]
 
+					evt.preventDefault()
+					evt.stopPropagation()
+
 					onRetry({ editor, uploadId })
 				} catch {
 					// 静默处理重试过程中的错误
@@ -50,10 +51,9 @@ export function installRetryHandler(
 		}
 	}
 
-	const leaf = plugin.app.workspace.activeLeaf as any
+		const leaf = plugin.app.workspace.getMostRecentLeaf?.()
 	const containerEl: HTMLElement =
 		(leaf?.view?.containerEl as HTMLElement) ??
-		(plugin.app.workspace as any)?.containerEl ??
 		document.body
 
 	containerEl.addEventListener('mousedown', onMouseDown, true)

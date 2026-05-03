@@ -1,5 +1,5 @@
 import { Plugin } from 'obsidian'
-import { PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
+import { PutObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { loadS3Config, buildPublicUrl, buildS3Client } from '../../s3/s3Manager'
 import { UPLOAD, TIMEOUTS } from '../constants/defaults'
@@ -179,47 +179,3 @@ export async function presignAndPutObject(
 	return publicUrl
 }
 
-/**
- * 主进程连通性测试：通过预签名 PUT 上传一个极小对象，然后再通过 SDK 直接 DELETE 清理
- * 仅在主进程执行，不做任何渲染端 URL 访问
- */
-async function testConnectionViaPresign(
-	plugin: Plugin,
-	opts: {
-		key: string
-		contentType: string
-		bodyBase64: string
-		expiresInSeconds?: number
-		presignTimeoutMs?: number
-		uploadTimeoutMs?: number
-	}
-): Promise<void> {
-	const {
-		key,
-		contentType,
-		bodyBase64,
-		expiresInSeconds = UPLOAD.DEFAULT_EXPIRY_SECONDS,
-		presignTimeoutMs,
-		uploadTimeoutMs,
-	} = opts
-
-	// 预签名并上传（丢弃返回的公开链接，不在测试里访问）
-	try {
-		await presignAndPutObject(plugin, {
-			key,
-			contentType,
-			bodyBase64,
-			expiresInSeconds,
-			presignTimeoutMs,
-			uploadTimeoutMs,
-		})
-	} finally {
-		// 清理对象
-		const { client, bucket } = buildS3Client(plugin)
-		try {
-			await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }))
-		} catch {
-			// test object may not have been created, ignore
-		}
-	}
-}
