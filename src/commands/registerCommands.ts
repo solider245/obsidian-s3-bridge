@@ -56,7 +56,7 @@ export function registerCommands(ctx: RegisterCtx) {
 					return
 				}
 
-				const maxMB = (window as any).__obS3_maxUploadMB__ ?? 5
+				const maxMB = window.__obS3_maxUploadMB__ ?? 5
 				const limitBytes = Math.max(1, Number(maxMB)) * 1024 * 1024
 				const ok = await ensureWithinLimitOrConfirm(choice.size, limitBytes)
 				if (!ok) {
@@ -104,7 +104,7 @@ export function registerCommands(ctx: RegisterCtx) {
 					return
 				}
 
-				const maxMB = (window as any).__obS3_maxUploadMB__ ?? 5
+				const maxMB = window.__obS3_maxUploadMB__ ?? 5
 				const limitBytes = Math.max(1, Number(maxMB)) * 1024 * 1024
 
 				const approxBytes =

@@ -154,14 +154,6 @@ export async function testConnection(
 			})
 		)
 
-		// DELETE
-		await client.send(
-			new DeleteObjectCommand({
-				Bucket: cfg.bucketName,
-				Key: opts.key,
-			})
-		)
-
 		// 仅用于提示，不返回任何 URL，避免上层去 fetch
 		try {
 			new Notice('S3 test completed in main process. No public URL requests were made.')
@@ -174,5 +166,17 @@ export async function testConnection(
 		// eslint-disable-next-line no-console
 		console.error('[ob-s3-gemini] S3 test failed raw error:', e)
 		throw new Error(hint)
+	} finally {
+		// DELETE - always clean up
+		try {
+			await client.send(
+				new DeleteObjectCommand({
+					Bucket: cfg.bucketName,
+					Key: opts.key,
+				})
+			)
+		} catch {
+			// test object may not have been created, ignore
+		}
 	}
 }

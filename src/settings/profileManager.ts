@@ -13,6 +13,14 @@ import { t, tp } from '../l10n'
 import { runCheck } from '../features/runCheck'
 import { PROVIDER_MANIFEST } from './providerFields'
 
+function debounce<T extends (...args: any[]) => void>(fn: T, delay: number): T {
+	let timer: ReturnType<typeof setTimeout> | null = null
+	return ((...args: any[]) => {
+		if (timer) clearTimeout(timer)
+		timer = setTimeout(() => fn(...args), delay)
+	}) as T
+}
+
 export function renderProfilesSection(
 	plugin: MyPlugin,
 	containerEl: HTMLElement,
@@ -101,12 +109,12 @@ export function renderProfileForm(plugin: MyPlugin, containerEl: HTMLElement, di
 	base.addText(ti => {
 		ti.setPlaceholder(t('Profile Name *'))
 			.setValue(active?.name ?? '')
-			.onChange(v => {
+			.onChange(debounce(v => {
 				if (!active) return
 				const merged = upsertProfile(plugin, { id: active.id, name: v.trim() })
 				setCurrentProfile(plugin, merged.id)
 				display()
-			})
+			}, 300))
 	})
 	base.addDropdown(dd => {
 		const types: ProviderType[] = ['cloudflare-r2', 'minio', 'aws-s3', 'custom']
@@ -145,10 +153,10 @@ export function renderProfileForm(plugin: MyPlugin, containerEl: HTMLElement, di
 				if (field.type === 'password') {
 					;(tx.inputEl as HTMLInputElement).type = 'password'
 				}
-				tx.onChange(v => {
+				tx.onChange(debounce(v => {
 					const patch: Partial<S3Profile> = { id: active.id, [field.key]: v.trim() }
 					upsertProfile(plugin, patch)
-				})
+				}, 300))
 			})
 		}
 	}

@@ -55,7 +55,7 @@ export interface WizardOptions {
 /**
  * 配置向导模态框
  */
-export class ConfigWizardModal extends Modal {
+class ConfigWizardModal extends Modal {
 	private options: Required<WizardOptions>
 	private currentStep = 0
 	private wizardData: any = {}
@@ -881,7 +881,7 @@ export class ConfigWizardModal extends Modal {
 }
 
 // 导出便捷函数
-export function showConfigWizard(app: App, options?: WizardOptions): void {
+function showConfigWizard(app: App, options?: WizardOptions): void {
 	const modal = new ConfigWizardModal(app, options)
 	modal.open()
 }

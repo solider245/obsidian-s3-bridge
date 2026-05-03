@@ -11,7 +11,7 @@ import { smartNotificationManager } from '../utils/smartNotifications'
 import { formatSpeed, formatEta, formatFileSize } from '../utils/uploadProgress'
 import { Notice, Modal, App } from 'obsidian'
 
-export class BatchUploadModal extends Modal {
+class BatchUploadModal extends Modal {
 	private uploader: BatchUploader
 	private progressEl: HTMLElement
 	private itemsListEl: HTMLElement

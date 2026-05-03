@@ -40,7 +40,7 @@ interface FileFilter {
 /**
  * 文件管理模态框
  */
-export class FileManagerModal extends Modal {
+class FileManagerModal extends Modal {
 	private files: FileItem[] = []
 	private filteredFiles: FileItem[] = []
 	private currentPage = 1

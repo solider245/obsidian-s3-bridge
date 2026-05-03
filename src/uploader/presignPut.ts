@@ -183,7 +183,7 @@ export async function presignAndPutObject(
  * 主进程连通性测试：通过预签名 PUT 上传一个极小对象，然后再通过 SDK 直接 DELETE 清理
  * 仅在主进程执行，不做任何渲染端 URL 访问
  */
-export async function testConnectionViaPresign(
+async function testConnectionViaPresign(
 	plugin: Plugin,
 	opts: {
 		key: string

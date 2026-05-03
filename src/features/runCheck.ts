@@ -1,5 +1,6 @@
 import { Notice, Plugin } from 'obsidian'
-import { loadActiveProfile, S3Profile } from '../../s3/s3Manager'
+import { loadActiveProfile, S3Profile, buildS3Client } from '../../s3/s3Manager'
+import { DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { t, tp } from '../l10n'
 import { getErrorMessage } from '../utils/errorHandling'
 
@@ -62,9 +63,25 @@ async function onlineCheck(plugin: Plugin) {
 
 	// 走与主流程一致的预签名+PUT路径
 	const [{ presignAndPutObject }] = await Promise.all([import('../uploader/presignPut')])
-	await presignAndPutObject(plugin, { key: testKey, contentType, bodyBase64: tinyPngBase64 })
-	new Notice(tp('Test upload succeeded: {bytes} bytes', { bytes: String(bytes) }))
-	return true
+	const { client } = buildS3Client(plugin)
+
+	try {
+		await presignAndPutObject(plugin, { key: testKey, contentType, bodyBase64: tinyPngBase64 })
+		new Notice(tp('Test upload succeeded: {bytes} bytes', { bytes: String(bytes) }))
+		return true
+	} finally {
+		// 清理测试对象，避免残留
+		try {
+			await client.send(
+				new DeleteObjectCommand({
+					Bucket: cfg.bucketName,
+					Key: testKey,
+				})
+			)
+		} catch {
+			/* 测试对象可能未被创建，忽略删除错误 */
+		}
+	}
 }
 
 /**

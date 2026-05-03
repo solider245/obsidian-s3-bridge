@@ -341,15 +341,3 @@ export class ConfigurationManager {
 // 导出单例实例
 export const configManager = ConfigurationManager.getInstance()
 
-// 便捷的配置访问函数
-export function getConfig<T>(key: string, defaultValue?: T): T {
-	return configManager.get(key, defaultValue)
-}
-
-export function setConfig<T>(key: string, value: T): void {
-	configManager.set(key, value)
-}
-
-export function onConfigChange<T>(key: string, listener: ConfigChangeListener<T>): () => void {
-	return configManager.onChange(key, listener)
-}

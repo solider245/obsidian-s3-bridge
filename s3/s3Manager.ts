@@ -196,6 +196,10 @@ function writeProfilesFile(plugin: Plugin, data: S3ProfilesFile): void {
 		})),
 	}
 	fs.writeFileSync(file, JSON.stringify(normalized, null, 2), 'utf-8')
+
+	// 清除配置缓存
+	const cacheKey = `s3Config_${plugin.manifest.id}`
+	configCache.delete(cacheKey)
 }
 
 /**
@@ -280,10 +284,6 @@ export function upsertProfile(plugin: Plugin, profile: Partial<S3Profile>): S3Pr
 	}
 	writeProfilesFile(plugin, data)
 
-	// 清除配置缓存
-	const cacheKey = `s3Config_${plugin.manifest.id}`
-	configCache.delete(cacheKey)
-
 	return merged
 }
 
@@ -298,10 +298,6 @@ export function removeProfile(plugin: Plugin, profileId: string): void {
 	const nextCurrent =
 		data.currentProfileId === profileId ? (filtered[0]?.id ?? null) : data.currentProfileId
 	writeProfilesFile(plugin, { currentProfileId: nextCurrent, profiles: filtered })
-
-	// 清除配置缓存
-	const cacheKey = `s3Config_${plugin.manifest.id}`
-	configCache.delete(cacheKey)
 }
 
 /**
@@ -316,10 +312,6 @@ export function setCurrentProfile(plugin: Plugin, profileId: string): void {
 	}
 	data.currentProfileId = profileId
 	writeProfilesFile(plugin, data)
-
-	// 清除配置缓存
-	const cacheKey = `s3Config_${plugin.manifest.id}`
-	configCache.delete(cacheKey)
 }
 
 /**
@@ -438,8 +430,4 @@ export function saveS3Config(plugin: Plugin, config: S3Config): void {
 		data.profiles.splice(idx, 1, merged)
 	}
 	writeProfilesFile(plugin, data)
-
-	// 清除配置缓存
-	const cacheKey = `s3Config_${plugin.manifest.id}`
-	configCache.delete(cacheKey)
 }

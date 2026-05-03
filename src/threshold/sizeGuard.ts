@@ -11,7 +11,7 @@ export async function ensureWithinLimitOrConfirm(
 	bytes: number,
 	limitBytes?: number
 ): Promise<boolean> {
-	const maxMB = (window as any).__obS3_maxUploadMB__ ?? 5
+	const maxMB = window.__obS3_maxUploadMB__ ?? 5
 	const limit = Math.max(1, Math.floor(Number(limitBytes ?? maxMB * 1024 * 1024)))
 	if (!Number.isFinite(bytes) || bytes <= 0) return true
 
