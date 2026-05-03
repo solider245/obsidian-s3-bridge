@@ -15,6 +15,7 @@ import { t, tp } from './src/l10n'
 import { MyPluginSettingTab, MyPluginSettings, DEFAULT_SETTINGS } from './settingsTab'
 import { registerCommands } from './src/commands/registerCommands'
 import { installPasteHandler } from './src/paste/installPasteHandler'
+import { installRetryHandler } from './src/retry/installRetryHandler'
 import { getFileExtensionFromMime } from './src/core/mime'
 import { readClipboardImageAsBase64 } from './src/core/readClipboard'
 import { ensureWithinLimitOrConfirm } from './src/threshold/sizeGuard'
@@ -80,6 +81,11 @@ export default class S3BridgePlugin extends Plugin {
 			plugin: this,
 			getExt: getFileExtensionFromMime,
 		})
+
+		const retry = installRetryHandler(this, ({ editor, uploadId }) => {
+			new Notice(tp('Retry not yet implemented for upload: {id}', { id: uploadId }))
+		})
+		this.register(() => retry.uninstall())
 	}
 
 	async onunload() {

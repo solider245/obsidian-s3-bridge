@@ -65,11 +65,11 @@ export async function performUpload(
 				fileSize,
 				presignTimeoutMs: Math.max(
 					TIMEOUTS.PRESIGN_MIN,
-					Number(presignTimeoutMs ?? (window as any).__obS3_presignTimeout__ ?? TIMEOUTS.PRESIGN_DEFAULT)
+					Number(presignTimeoutMs ?? window.__obS3_presignTimeout__ ?? TIMEOUTS.PRESIGN_DEFAULT)
 				),
 				uploadTimeoutMs: Math.max(
 					TIMEOUTS.UPLOAD_MIN,
-					Number(uploadTimeoutMs ?? (window as any).__obS3_uploadTimeout__ ?? TIMEOUTS.UPLOAD_DEFAULT)
+					Number(uploadTimeoutMs ?? window.__obS3_uploadTimeout__ ?? TIMEOUTS.UPLOAD_DEFAULT)
 				),
 				fileName,
 				onProgress: progress => {
@@ -89,11 +89,11 @@ export async function performUpload(
 				bodyBase64: base64,
 				presignTimeoutMs: Math.max(
 					TIMEOUTS.PRESIGN_MIN,
-					Number(presignTimeoutMs ?? (window as any).__obS3_presignTimeout__ ?? TIMEOUTS.PRESIGN_DEFAULT)
+					Number(presignTimeoutMs ?? window.__obS3_presignTimeout__ ?? TIMEOUTS.PRESIGN_DEFAULT)
 				),
 				uploadTimeoutMs: Math.max(
 					TIMEOUTS.UPLOAD_MIN,
-					Number(uploadTimeoutMs ?? (window as any).__obS3_uploadTimeout__ ?? TIMEOUTS.UPLOAD_DEFAULT)
+					Number(uploadTimeoutMs ?? window.__obS3_uploadTimeout__ ?? TIMEOUTS.UPLOAD_DEFAULT)
 				),
 			})
 		}

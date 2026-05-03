@@ -48,7 +48,7 @@ export function installPasteHandler(ctx: PasteCtx): void {
 				const uploadId = generateUploadId()
 				const key = makeObjectKey(file.name, ext, config.keyPrefix || '', uploadId)
 
-				const maxMB = window.__obS3_maxUploadMB__ ?? 50
+				const maxMB = window.__obS3_maxUploadMB__ ?? 5
 				const limitBytes = Math.max(1, Number(maxMB)) * 1024 * 1024
 				if (file.size > limitBytes) {
 					const ok = confirm(
