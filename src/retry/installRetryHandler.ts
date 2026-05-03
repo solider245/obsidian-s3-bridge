@@ -12,7 +12,7 @@ import { MarkdownView } from 'obsidian'
 // 与 optimistic.ts 中保持一致的失败占位匹配
 const PLACEHOLDER_NAMESPACE = 'ob-s3'
 const RE_FAILED = new RegExp(
-	String.raw`!\[[^\]]*?\b${PLACEHOLDER_NAMESPACE}:id=([A-Za-z0-9]{16})\s+status=failed[^\]]*?\]\((?:#|https?:\/\/[^\)]+|blob:[^\)]+|[^)]+)?\)\s*\[([^\]]*?)\]\(#\)`,
+	String.raw`!\[[^\]]*?\b${PLACEHOLDER_NAMESPACE}:id=([A-Za-z0-9_-]+)\s+status=failed[^\]]*?\]\((?:#|https?:\/\/[^\)]+|blob:[^\)]+|[^)]+)?\)\s*\[([^\]]*?)\]\(#\)`,
 	'm'
 )
 

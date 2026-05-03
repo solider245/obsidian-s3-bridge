@@ -100,7 +100,7 @@ export function registerCommands(ctx: RegisterCtx) {
 			try {
 				const clip = await readClipboardImageAsBase64()
 				if (!clip) {
-					new Notice(tp('Upload failed: {error}', { error: 'No image in clipboard' }))
+					new Notice(t('No image found in clipboard'))
 					return
 				}
 

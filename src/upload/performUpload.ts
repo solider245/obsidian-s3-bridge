@@ -11,6 +11,7 @@ import { uploadProgressManager } from '../utils/uploadProgress'
 import { createMultipartUpload } from '../utils/multipartUpload'
 import { UPLOAD, TIMEOUTS } from '../constants/defaults'
 import { nowMs } from '../utils/nowMs'
+import { getErrorMessage } from '../utils/errorHandling'
 
 export async function performUpload(
 	plugin: Plugin,
@@ -22,12 +23,13 @@ export async function performUpload(
 		uploadTimeoutMs?: number
 		fileName?: string
 		uploadId?: string
+		fileSize?: number
 	}
 ): Promise<string> {
 	const { key, mime, base64, presignTimeoutMs, uploadTimeoutMs, fileName } = args
 
 	// 计算文件大小
-	const fileSize = Math.floor((base64.length * 3) / 4)
+	const fileSize = args.fileSize ?? Math.floor((base64.length * 3) / 4)
 
 	// 复用调用方的 uploadId，或者自生成一个
 	const uploadId = args.uploadId ?? `upload_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`
@@ -110,7 +112,7 @@ export async function performUpload(
 		return url
 	} catch (e) {
 		const sec = Math.max(0, (nowMs() - t0) / 1000)
-		const errorMsg = (e as any)?.message ?? String(e)
+		const errorMsg = getErrorMessage(e)
 		try {
 			console.error('[ob-s3-gemini] upload failed', {
 				key,

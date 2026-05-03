@@ -8,7 +8,7 @@ export function getFileExtensionFromMime(mime: string): string {
 	if (!mime) return 'bin'
 	const m = mime.toLowerCase()
 	if (m.includes('png')) return 'png'
-	if (m.includes('jpeg') || m.includes('jpg')) return 'jpg'
+	if (m.includes('jpeg')) return 'jpg'
 	if (m.includes('gif')) return 'gif'
 	if (m.includes('webp')) return 'webp'
 	if (m.includes('svg')) return 'svg'
@@ -32,5 +32,14 @@ export function getFileExtensionFromMime(mime: string): string {
 	if (m.includes('zip')) return 'zip'
 	if (m.includes('rar')) return 'rar'
 	if (m.includes('7z')) return '7z'
+	// 扩展格式
+	if (m.includes('image/avif')) return 'avif'
+	if (m.includes('image/heic')) return 'heic'
+	if (m.includes('image/heif')) return 'heif'
+	if (m.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document')) return 'docx'
+	if (m.includes('application/epub+zip')) return 'epub'
+	if (m.includes('audio/flac')) return 'flac'
+	if (m.includes('video/x-matroska')) return 'mkv'
+	if (m.includes('audio/aac')) return 'aac'
 	return 'bin'
 }

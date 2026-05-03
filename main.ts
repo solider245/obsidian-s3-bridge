@@ -159,7 +159,7 @@ export default class S3BridgePlugin extends Plugin {
 	 */
 	private generateUserId(): string {
 		// 生成一个简单的用户ID，基于时间戳和随机数
-		return `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+		return `user_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
 	}
 
 	/**

@@ -35,7 +35,7 @@ export async function getPresignedPutUrl(
 	const to =
 		typeof timeoutMs === 'number' && timeoutMs > 0
 			? Math.floor(timeoutMs)
-			: Math.max(TIMEOUTS.PRESIGN_MIN, Number((window as any).__obS3_presignTimeout__ ?? TIMEOUTS.PRESIGN_DEFAULT))
+			: Math.max(TIMEOUTS.PRESIGN_MIN, Number(window.__obS3_presignTimeout__ ?? TIMEOUTS.PRESIGN_DEFAULT))
 
 	// 超时包装
 	const url = await Promise.race([
@@ -81,7 +81,7 @@ export async function putWithHttps(
 	const to =
 		typeof timeoutMs === 'number' && timeoutMs > 0
 			? Math.floor(timeoutMs)
-			: Math.max(1000, Number((window as any).__obS3_uploadTimeout__ ?? 25000))
+			: Math.max(1000, Number(window.__obS3_uploadTimeout__ ?? 25000))
 
 	await new Promise<void>((resolve, reject) => {
 		let finished = false
