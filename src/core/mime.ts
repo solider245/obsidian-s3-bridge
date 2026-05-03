@@ -34,5 +34,3 @@ export function getFileExtensionFromMime(mime: string): string {
 	if (m.includes('7z')) return '7z'
 	return 'bin'
 }
-
-export default { getFileExtensionFromMime }

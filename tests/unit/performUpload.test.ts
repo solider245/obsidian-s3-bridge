@@ -28,13 +28,10 @@ global.window = {} as any
 
 // 动态导入以避免顶层await问题
 let presignAndPutObject: any
-let buildPublicUrl: any
 
 beforeAll(async () => {
 	const presignModule = await import('../../src/uploader/presignPut')
-	const s3Module = await import('../../s3/s3Manager')
 	presignAndPutObject = presignModule.presignAndPutObject
-	buildPublicUrl = s3Module.buildPublicUrl
 })
 
 describe('performUpload', () => {
@@ -70,11 +67,10 @@ describe('performUpload', () => {
 	})
 
 	it('应该成功执行上传并返回公开URL', async () => {
-		const mockPresignedUrl = 'https://example.com/presigned-url'
+		
 		const mockPublicUrl = 'https://example.com/public/test.jpg'
 
-		;(presignAndPutObject as any).mockResolvedValue(mockPresignedUrl)
-		;(buildPublicUrl as any).mockReturnValue(mockPublicUrl)
+		;(presignAndPutObject as any).mockResolvedValue(mockPublicUrl)
 
 		const result = await performUpload(mockPlugin, mockUploadArgs)
 
@@ -87,15 +83,13 @@ describe('performUpload', () => {
 				bodyBase64: mockUploadArgs.base64,
 			})
 		)
-		expect(buildPublicUrl).toHaveBeenCalledWith(mockPlugin, mockUploadArgs.key)
 	})
 
 	it('应该正确处理上传进度', async () => {
-		const mockPresignedUrl = 'https://example.com/presigned-url'
+		
 		const mockPublicUrl = 'https://example.com/public/test.jpg'
 
-		;(presignAndPutObject as any).mockResolvedValue(mockPresignedUrl)
-		;(buildPublicUrl as any).mockReturnValue(mockPublicUrl)
+		;(presignAndPutObject as any).mockResolvedValue(mockPublicUrl)
 
 		await performUpload(mockPlugin, mockUploadArgs)
 
@@ -142,11 +136,10 @@ describe('performUpload', () => {
 	})
 
 	it('应该使用默认的MIME类型', async () => {
-		const mockPresignedUrl = 'https://example.com/presigned-url'
+		
 		const mockPublicUrl = 'https://example.com/public/test.jpg'
 
-		;(presignAndPutObject as any).mockResolvedValue(mockPresignedUrl)
-		;(buildPublicUrl as any).mockReturnValue(mockPublicUrl)
+		;(presignAndPutObject as any).mockResolvedValue(mockPublicUrl)
 
 		const argsWithoutMime = { ...mockUploadArgs, mime: '' }
 		await performUpload(mockPlugin, argsWithoutMime)
@@ -160,11 +153,10 @@ describe('performUpload', () => {
 	})
 
 	it('应该正确处理自定义超时时间', async () => {
-		const mockPresignedUrl = 'https://example.com/presigned-url'
+		
 		const mockPublicUrl = 'https://example.com/public/test.jpg'
 
-		;(presignAndPutObject as any).mockResolvedValue(mockPresignedUrl)
-		;(buildPublicUrl as any).mockReturnValue(mockPublicUrl)
+		;(presignAndPutObject as any).mockResolvedValue(mockPublicUrl)
 
 		const argsWithTimeout = {
 			...mockUploadArgs,
@@ -184,11 +176,10 @@ describe('performUpload', () => {
 	})
 
 	it('应该使用全局超时配置作为后备', async () => {
-		const mockPresignedUrl = 'https://example.com/presigned-url'
+		
 		const mockPublicUrl = 'https://example.com/public/test.jpg'
 
-		;(presignAndPutObject as any).mockResolvedValue(mockPresignedUrl)
-		;(buildPublicUrl as any).mockReturnValue(mockPublicUrl)
+		;(presignAndPutObject as any).mockResolvedValue(mockPublicUrl)
 
 		// 模拟全局配置
 		;(global as any).window = {
@@ -208,11 +199,10 @@ describe('performUpload', () => {
 	})
 
 	it('应该计算正确的文件大小', async () => {
-		const mockPresignedUrl = 'https://example.com/presigned-url'
+		
 		const mockPublicUrl = 'https://example.com/public/test.jpg'
 
-		;(presignAndPutObject as any).mockResolvedValue(mockPresignedUrl)
-		;(buildPublicUrl as any).mockReturnValue(mockPublicUrl)
+		;(presignAndPutObject as any).mockResolvedValue(mockPublicUrl)
 
 		await performUpload(mockPlugin, mockUploadArgs)
 

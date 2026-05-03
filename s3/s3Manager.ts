@@ -213,6 +213,11 @@ export function upsertProfile(plugin: Plugin, profile: Partial<S3Profile>): S3Pr
 		if (!data.currentProfileId) data.currentProfileId = merged.id
 	}
 	writeProfilesFile(plugin, data)
+
+	// 清除配置缓存
+	const cacheKey = `s3Config_${plugin.manifest.id}`
+	configCache.delete(cacheKey)
+
 	return merged
 }
 
@@ -227,6 +232,10 @@ export function removeProfile(plugin: Plugin, profileId: string): void {
 	const nextCurrent =
 		data.currentProfileId === profileId ? (filtered[0]?.id ?? null) : data.currentProfileId
 	writeProfilesFile(plugin, { currentProfileId: nextCurrent, profiles: filtered })
+
+	// 清除配置缓存
+	const cacheKey = `s3Config_${plugin.manifest.id}`
+	configCache.delete(cacheKey)
 }
 
 /**
@@ -241,6 +250,10 @@ export function setCurrentProfile(plugin: Plugin, profileId: string): void {
 	}
 	data.currentProfileId = profileId
 	writeProfilesFile(plugin, data)
+
+	// 清除配置缓存
+	const cacheKey = `s3Config_${plugin.manifest.id}`
+	configCache.delete(cacheKey)
 }
 
 /**

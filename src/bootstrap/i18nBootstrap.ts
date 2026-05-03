@@ -31,5 +31,3 @@ export async function registerBuiltinPacksAndLoad(plugin: Plugin): Promise<void>
 	registerBuiltinLang('zh-CN', zh)
 	await loadTranslations(plugin)
 }
-
-export default { registerBuiltinPacksAndLoad }

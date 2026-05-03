@@ -68,7 +68,7 @@ export function registerCommands(ctx: RegisterCtx) {
 				const base64 = Buffer.from(arrayBuffer).toString('base64')
 				const mime = choice.type || 'application/octet-stream'
 				const ext = getExt(mime)
-				const cfgNow = await loadS3Config(plugin)
+				const cfgNow = loadS3Config(plugin)
 				const keyPrefix = (cfgNow.keyPrefix || '').replace(/^\/+|\/+$/g, '')
 				const uploadId = generateUploadId()
 				const key = makeObjectKey(choice.name || 'clipboard-upload', ext, keyPrefix, uploadId)
@@ -95,7 +95,7 @@ export function registerCommands(ctx: RegisterCtx) {
 	// 从剪贴板上传图片
 	plugin.addCommand({
 		id: 'obs3gemini-upload-from-clipboard',
-		name: 'Upload Image from Clipboard',
+		name: t('Upload Image from Clipboard'),
 		callback: async () => {
 			try {
 				const clip = await readClipboardImageAsBase64()
@@ -116,7 +116,7 @@ export function registerCommands(ctx: RegisterCtx) {
 				}
 
 				const ext = getExt(clip.mime)
-				const cfgNow = await loadS3Config(plugin)
+				const cfgNow = loadS3Config(plugin)
 				const keyPrefix = (cfgNow.keyPrefix || '').replace(/^\/+|\/+$/g, '')
 				const uploadId = generateUploadId()
 				const key = makeObjectKey('clipboard-upload', ext, keyPrefix, uploadId)
@@ -141,5 +141,3 @@ export function registerCommands(ctx: RegisterCtx) {
 		},
 	})
 }
-
-export default { registerCommands }

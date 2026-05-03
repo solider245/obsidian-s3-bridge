@@ -28,5 +28,3 @@ export async function readClipboardImageAsBase64(): Promise<{
 		return null
 	}
 }
-
-export default { readClipboardImageAsBase64 }

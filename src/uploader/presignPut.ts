@@ -1,4 +1,4 @@
-import { Plugin, Notice } from 'obsidian'
+import { Plugin } from 'obsidian'
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { loadS3Config, buildPublicUrl } from '../../s3/s3Manager'
@@ -48,7 +48,7 @@ function buildS3Client(plugin: Plugin): {
 		)
 	}
 
-	const configHash = `${cfg.endpoint}|${cfg.accessKeyId}|${cfg.bucketName}|${cfg.region || ''}`
+	const configHash = `${cfg.endpoint}|${cfg.accessKeyId}|${cfg.secretAccessKey}|${cfg.bucketName}|${cfg.region || ''}|${cfg.useSSL}`
 	if (cachedClient?.configHash === configHash) {
 		return cachedClient
 	}
@@ -240,9 +240,6 @@ export async function presignAndPutObject(
 
 	// 生成最终公开链接
 	const publicUrl = buildPublicUrl(plugin, key)
-	try {
-		new Notice('Upload successful!')
-	} catch {}
 	return publicUrl
 }
 

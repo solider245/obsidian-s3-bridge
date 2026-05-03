@@ -139,7 +139,7 @@ export class MultipartUploadManager {
 
 			// 完成分片上传
 			uploadProgressManager.updateProgress(uploadId, 95, 'processing', 'Completing upload...')
-			const publicUrl = await this.completeUpload(uploadId)
+			const publicUrl = await this.completeUpload()
 
 			uploadProgressManager.completeUpload(uploadId, publicUrl)
 			return publicUrl
@@ -373,7 +373,7 @@ export class MultipartUploadManager {
 		})
 	}
 
-	private async completeUpload(uploadId: string): Promise<string> {
+	private async completeUpload(): Promise<string> {
 		if (!this.uploadId) {
 			throw new Error('No upload ID')
 		}

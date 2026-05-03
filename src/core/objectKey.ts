@@ -49,5 +49,3 @@ export function makeObjectKey(
 	pieces.push(fileName)
 	return pieces.join('/')
 }
-
-export default { makeObjectKey }

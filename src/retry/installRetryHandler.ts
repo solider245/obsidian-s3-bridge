@@ -27,6 +27,9 @@ export function installRetryHandler(
 			const editor: Editor = view.editor
 			if (!editor) return
 
+			evt.preventDefault()
+			evt.stopPropagation()
+
 			setTimeout(() => {
 				try {
 					const pos = editor.getCursor()
@@ -37,8 +40,6 @@ export function installRetryHandler(
 					if (!m) return
 					const uploadId = m[1]
 
-					evt.preventDefault()
-					evt.stopPropagation()
 					onRetry({ editor, uploadId })
 				} catch {
 					// 静默处理重试过程中的错误
@@ -63,5 +64,3 @@ export function installRetryHandler(
 		},
 	}
 }
-
-export default { installRetryHandler }

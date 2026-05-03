@@ -27,5 +27,3 @@ export async function ensureWithinLimitOrConfirm(
 	}
 	return true
 }
-
-export default { ensureWithinLimitOrConfirm }

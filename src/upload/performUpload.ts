@@ -8,7 +8,6 @@
 import type { Plugin } from 'obsidian'
 import { presignAndPutObject } from '../uploader/presignPut'
 import { uploadProgressManager } from '../utils/uploadProgress'
-import { buildPublicUrl } from '../../s3/s3Manager'
 import { createMultipartUpload } from '../utils/multipartUpload'
 import { UPLOAD, TIMEOUTS } from '../constants/defaults'
 
@@ -110,13 +109,10 @@ export async function performUpload(
 		// 更新进度：处理阶段
 		uploadProgressManager.updateProgress(uploadId, 90, 'processing', 'Processing upload...')
 
-		// 构建公开URL
-		const publicUrl = buildPublicUrl(plugin, key)
+		// 完成上传（url 已由 presignAndPutObject / createMultipartUpload 内部通过 buildPublicUrl 生成）
+		uploadProgressManager.completeUpload(uploadId, url)
 
-		// 完成上传
-		uploadProgressManager.completeUpload(uploadId, publicUrl)
-
-		return publicUrl
+		return url
 	} catch (e) {
 		const t1 =
 			typeof performance !== 'undefined' && (performance as any).now
@@ -138,5 +134,3 @@ export async function performUpload(
 		throw e
 	}
 }
-
-export default { performUpload }
