@@ -10,6 +10,11 @@ export async function resizeImage(
 ): Promise<string> {
 	return new Promise((resolve, reject) => {
 		const img = new Image()
+		// GIFs are animated; Canvas only captures the first frame
+		if (mime === 'image/gif') {
+			resolve(base64)
+			return
+		}
 		img.onload = () => {
 			try {
 				const { width, height } = img

@@ -38,6 +38,15 @@ export default class S3BridgePlugin extends Plugin {
 	async onload() {
 		// 加载设置
 		await this.loadSettings()
+		this.syncSettingsToGlobals()
+
+		// Auto-sync settings to window globals on every save
+		const origSaveSettings = this.saveSettings.bind(this)
+		this.saveSettings = async () => {
+			await origSaveSettings()
+			this.syncSettingsToGlobals()
+		}
+
 		await registerBuiltinPacksAndLoad(this)
 
 		// 初始化上传通知系统
@@ -199,6 +208,16 @@ export default class S3BridgePlugin extends Plugin {
 	private generateUserId(): string {
 		// 生成一个简单的用户ID，基于时间戳和随机数
 		return `user_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
+	}
+
+	/**
+	 * 同步插件设置到 window 全局变量，供运行时代码读取
+	 */
+	private syncSettingsToGlobals(): void {
+		window.__obS3_maxUploadMB__ = this.settings.maxUploadSize
+		window.__obS3_enableImageCompression__ = this.settings.enableImageCompression
+		window.__obS3_maxImageDimension__ = this.settings.maxImageDimension
+		window.__obS3_imageQuality__ = this.settings.imageQuality
 	}
 
 	/**

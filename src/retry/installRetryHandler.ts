@@ -34,20 +34,27 @@ export function installRetryHandler(
 					const lineText = editor.getLine(pos.line) ?? ''
 					if (!lineText.includes('status=failed') || !lineText.includes('](#)')) return
 
-					const m = lineText.match(RE_FAILED)
-					if (!m) return
-					const uploadId = m[1]
+					// matchAll 遍历所有匹配，按光标列定位点击的占位符
+					const re = new RegExp(RE_FAILED.source, 'gm')
+					let uploadId: string | null = null
+					for (const m of lineText.matchAll(re)) {
+						if (m.index !== undefined && pos.ch >= m.index && pos.ch <= m.index + m[0].length) {
+							uploadId = m[1]
+							break
+						}
+					}
+					if (!uploadId) return
 
 					evt.preventDefault()
 					evt.stopPropagation()
 
 					onRetry({ editor, uploadId })
-				} catch {
-					// 静默处理重试过程中的错误
+				} catch (e) {
+					console.warn('[ob-s3] retry handler error', e)
 				}
 			}, 0)
-		} catch {
-			// 静默处理鼠标事件处理错误
+		} catch (e) {
+			console.warn('[ob-s3] retry mousedown handler error', e)
 		}
 	}
 

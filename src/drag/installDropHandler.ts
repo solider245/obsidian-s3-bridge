@@ -24,13 +24,19 @@ export function installDropHandler(ctx: DropCtx): void {
 				const files = evt.dataTransfer?.files
 				if (!files || files.length === 0) return
 
-				const imageFiles = Array.from(files).filter(
-					f => f.type.startsWith('image/')
-				)
+				const allFiles = Array.from(files)
+				const imageFiles = allFiles.filter(f => f.type.startsWith('image/'))
 				if (imageFiles.length === 0) return
 
 				// 阻止默认拖拽行为
 				evt.preventDefault()
+
+				// 混合拖拽：提示跳过的非图片文件
+				if (imageFiles.length < allFiles.length) {
+					const skipped = allFiles.filter(f => !f.type.startsWith('image/'))
+					const names = skipped.map(f => f.name).join(', ')
+					console.warn('[ob-s3] Skipped non-image files in mixed drop:', names)
+				}
 
 				const config = loadS3Config(plugin)
 				const maxMB = window.__obS3_maxUploadMB__ ?? 5
