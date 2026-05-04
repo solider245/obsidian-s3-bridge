@@ -1,5 +1,5 @@
 // 概述: 设置项 Schema 定义 — 声明式描述每个设置字段，由 renderSettings 消费
-// 导出: SettingFieldDef, UPLOAD_SETTINGS, PROGRESS_SETTINGS, INTERFACE_SETTINGS, RETRY_SETTINGS, SUPABASE_SETTINGS, KEY_PREFIX_SETTINGS
+// 导出: SettingFieldDef, UPLOAD_SETTINGS, COMPRESSION_SETTINGS, PROGRESS_SETTINGS, INTERFACE_SETTINGS, RETRY_SETTINGS, SUPABASE_SETTINGS, KEY_PREFIX_SETTINGS
 // 依赖: 无
 
 export interface SettingFieldDef {
@@ -48,6 +48,36 @@ export const UPLOAD_SETTINGS: SettingFieldDef[] = [
 		min: 1,
 		max: 500,
 		step: 1,
+	},
+]
+
+export const COMPRESSION_SETTINGS: SettingFieldDef[] = [
+	{
+		key: 'enableImageCompression',
+		type: 'toggle',
+		label: 'Enable image compression',
+		desc: 'Automatically resize large images before upload to save bandwidth',
+		defaultValue: true,
+	},
+	{
+		key: 'maxImageDimension',
+		type: 'slider',
+		label: 'Max image dimension (px)',
+		desc: 'Images larger than this will be scaled down proportionally',
+		defaultValue: 1920,
+		min: 800,
+		max: 4096,
+		step: 100,
+	},
+	{
+		key: 'imageQuality',
+		type: 'slider',
+		label: 'Image quality (%)',
+		desc: 'JPEG/WEBP compression quality',
+		defaultValue: 85,
+		min: 50,
+		max: 100,
+		step: 5,
 	},
 ]
 

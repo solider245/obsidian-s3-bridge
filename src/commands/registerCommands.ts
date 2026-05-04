@@ -8,6 +8,8 @@
 import type { Editor, Plugin } from 'obsidian'
 import { Notice, MarkdownView } from 'obsidian'
 import { t, tp } from '../l10n'
+import { stashFailed } from '../retry/retryCache'
+import { resizeImage } from '../compress/imageResize'
 import { loadS3Config } from '../../s3/s3Manager'
 import { runCheck } from '../features/runCheck'
 import { performUpload } from '../upload/performUpload'
@@ -39,12 +41,19 @@ export function registerCommands(ctx: RegisterCtx) {
 		id: 'obs3gemini-upload-from-local-file',
 		name: t('Upload File from Local...'),
 		callback: async () => {
+			const uploadId = generateUploadId()
+			const cfgNow = loadS3Config(plugin)
+			const keyPrefix = cfgNow.keyPrefix || ''
+			let key = ''
+			let uploadBase64 = ''
+			let uploadMime = ''
+			let choice: File | null = null
 			try {
 				const input = document.createElement('input')
 				input.type = 'file'
 				input.multiple = false
 				input.accept = ''
-				const choice = await new Promise<File | null>(resolve => {
+				choice = await new Promise<File | null>(resolve => {
 					input.onchange = () => {
 						const f = input.files && input.files[0] ? input.files[0] : null
 						resolve(f)
@@ -68,12 +77,22 @@ export function registerCommands(ctx: RegisterCtx) {
 				const base64 = Buffer.from(arrayBuffer).toString('base64')
 				const mime = choice.type || 'application/octet-stream'
 				const ext = getExt(mime)
-				const cfgNow = loadS3Config(plugin)
-				const keyPrefix = cfgNow.keyPrefix || ''
-				const uploadId = generateUploadId()
-				const key = makeObjectKey(choice.name || 'clipboard-upload', ext, keyPrefix, uploadId)
+				key = makeObjectKey(choice.name || 'clipboard-upload', ext, keyPrefix, uploadId)
 
-				const url = await performUpload(plugin, { key, mime, base64, fileName: choice.name, uploadId })
+				uploadBase64 = base64
+				uploadMime = mime
+				const shouldCompress = window.__obS3_enableImageCompression__ ?? true
+				if (shouldCompress && mime.startsWith('image/') && !mime.includes('svg')) {
+					const maxDim = window.__obS3_maxImageDimension__ ?? 1920
+					const quality = (window.__obS3_imageQuality__ ?? 85) / 100
+					try {
+						uploadBase64 = await resizeImage(base64, mime, maxDim, quality)
+					} catch {
+						// Use original if compression fails
+					}
+				}
+
+				const url = await performUpload(plugin, { key, mime: uploadMime, base64: uploadBase64, fileName: choice.name, uploadId })
 
 				const view = plugin.app.workspace.getActiveViewOfType(MarkdownView)
 				if (view) {
@@ -87,6 +106,12 @@ export function registerCommands(ctx: RegisterCtx) {
 				}
 			} catch (e: unknown) {
 				const errorMsg = getErrorMessage(e)
+				stashFailed(uploadId, { key, mime: uploadMime, base64: uploadBase64, fileName: choice!.name })
+				const view = plugin.app.workspace.getActiveViewOfType(MarkdownView)
+				if (view) {
+					const editor: Editor = view.editor
+					editor.replaceSelection(`![${choice!.name} ob-s3:id=${uploadId} status=failed](#) [Retry](#)`)
+				}
 				new Notice(tp('Upload failed: {error}', { error: errorMsg }))
 			}
 		},
@@ -97,6 +122,12 @@ export function registerCommands(ctx: RegisterCtx) {
 		id: 'obs3gemini-upload-from-clipboard',
 		name: t('Upload Image from Clipboard'),
 		callback: async () => {
+			const uploadId = generateUploadId()
+			const cfgNow = loadS3Config(plugin)
+			const keyPrefix = cfgNow.keyPrefix || ''
+			let key = ''
+			let uploadBase64 = ''
+			let uploadMime = ''
 			try {
 				const clip = await readClipboardImageAsBase64()
 				if (!clip) {
@@ -116,15 +147,25 @@ export function registerCommands(ctx: RegisterCtx) {
 				}
 
 				const ext = getExt(clip.mime)
-				const cfgNow = loadS3Config(plugin)
-				const keyPrefix = cfgNow.keyPrefix || ''
-				const uploadId = generateUploadId()
-				const key = makeObjectKey('clipboard-upload', ext, keyPrefix, uploadId)
+				key = makeObjectKey('clipboard-upload', ext, keyPrefix, uploadId)
+
+				uploadBase64 = clip.base64
+				uploadMime = clip.mime || 'application/octet-stream'
+				const shouldCompress = window.__obS3_enableImageCompression__ ?? true
+				if (shouldCompress && clip.mime.startsWith('image/') && !clip.mime.includes('svg')) {
+					const maxDim = window.__obS3_maxImageDimension__ ?? 1920
+					const quality = (window.__obS3_imageQuality__ ?? 85) / 100
+					try {
+						uploadBase64 = await resizeImage(clip.base64, clip.mime, maxDim, quality)
+					} catch {
+						// Use original if compression fails
+					}
+				}
 
 				const url = await performUpload(plugin, {
 					key,
-					mime: clip.mime || 'application/octet-stream',
-					base64: clip.base64,
+					mime: uploadMime,
+					base64: uploadBase64,
 					fileName: 'clipboard-image',
 					uploadId,
 				})
@@ -137,6 +178,12 @@ export function registerCommands(ctx: RegisterCtx) {
 				}
 			} catch (e: unknown) {
 				const errorMsg = getErrorMessage(e)
+				stashFailed(uploadId, { key, mime: uploadMime, base64: uploadBase64, fileName: 'clipboard-image' })
+				const view = plugin.app.workspace.getActiveViewOfType(MarkdownView)
+				if (view) {
+					const editor: Editor = view.editor
+					editor.replaceSelection(`![clipboard-image ob-s3:id=${uploadId} status=failed](#) [Retry](#)`)
+				}
 				new Notice(tp('Upload failed: {error}', { error: errorMsg }))
 			}
 		},

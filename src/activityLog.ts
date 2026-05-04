@@ -5,7 +5,7 @@ const DATA_FILE = 'data.json'
 export interface ActivityDetails {
 	url?: string
 	fileName?: string
-	source?: 'paste' | 'command' | 'clipboard' | 'paste_unexpected'
+	source?: 'paste' | 'command' | 'clipboard' | 'drop' | 'paste_unexpected' | 'drop_unexpected'
 	size?: number
 	duration?: number
 	error?: string

@@ -9,6 +9,7 @@ import { activityLog } from '../activityLog'
 import { generateUploadId } from '../utils/generateUploadId'
 import { getErrorMessage, getErrorType } from '../utils/errorHandling'
 import { stashFailed } from '../retry/retryCache'
+import { resizeImage } from '../compress/imageResize'
 
 export interface PasteCtx {
 	plugin: Plugin
@@ -43,6 +44,22 @@ export function installPasteHandler(ctx: PasteCtx): void {
 				const arrayBuffer = await file.arrayBuffer()
 				const base64 = Buffer.from(arrayBuffer).toString('base64')
 				const mime = file.type || 'application/octet-stream'
+
+				// Check if compression is enabled
+				const shouldCompress = window.__obS3_enableImageCompression__ ?? true
+				let uploadBase64 = base64
+				let uploadMime = mime
+				if (shouldCompress && mime.startsWith('image/') && !mime.includes('svg')) {
+					const maxDim = window.__obS3_maxImageDimension__ ?? 1920
+					const quality = (window.__obS3_imageQuality__ ?? 85) / 100
+					try {
+						const resized = await resizeImage(base64, mime, maxDim, quality)
+						uploadBase64 = resized
+					} catch {
+						// If compression fails, use original
+					}
+				}
+
 				const ext = getExt(mime)
 
 				const config = loadS3Config(plugin)
@@ -67,15 +84,15 @@ export function installPasteHandler(ctx: PasteCtx): void {
 				try {
 					finalUrl = await performUpload(plugin, {
 						key,
-						mime,
-						base64,
+						mime: uploadMime,
+						base64: uploadBase64,
 						fileName: file.name,
 						uploadId,
 					})
 				} catch (e: unknown) {
 					const errorMsg = getErrorMessage(e)
 					const errorType = getErrorType(e)
-					stashFailed(uploadId, { key, mime, base64, fileName: file.name })
+					stashFailed(uploadId, { key, mime: uploadMime, base64: uploadBase64, fileName: file.name })
 					editor.replaceRange(
 						`![${file.name} ob-s3:id=${uploadId} status=failed](#) [Retry](#)`,
 						startPos,

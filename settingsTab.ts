@@ -5,6 +5,7 @@ import { renderActivityLogSection } from './src/settings/uiComponents'
 import { renderSettings } from './src/settings/settingsRenderer'
 import {
 	UPLOAD_SETTINGS,
+	COMPRESSION_SETTINGS,
 	PROGRESS_SETTINGS,
 	INTERFACE_SETTINGS,
 	RETRY_SETTINGS,
@@ -34,6 +35,10 @@ export interface MyPluginSettings {
 	retryFailedUploads?: boolean
 	maxRetries?: number
 	retryDelay?: number
+
+	enableImageCompression?: boolean
+	maxImageDimension?: number
+	imageQuality?: number
 
 	enableSupabaseSync?: boolean
 	supabaseUrl?: string
@@ -67,6 +72,10 @@ export const DEFAULT_SETTINGS: MyPluginSettings = {
 	maxRetries: 3,
 	retryDelay: 1000,
 
+	enableImageCompression: true,
+	maxImageDimension: 1920,
+	imageQuality: 85,
+
 	enableSupabaseSync: false,
 	supabaseUrl: '',
 	supabaseKey: '',
@@ -91,6 +100,7 @@ export class MyPluginSettingTab extends PluginSettingTab {
 		renderProfileForm(this.plugin, containerEl, () => this.display())
 
 		renderSettings(containerEl, '上传设置', UPLOAD_SETTINGS, this.plugin)
+		renderSettings(containerEl, '图片压缩', COMPRESSION_SETTINGS, this.plugin)
 		renderSettings(containerEl, '进度反馈', PROGRESS_SETTINGS, this.plugin)
 		renderSettings(containerEl, '界面设置', INTERFACE_SETTINGS, this.plugin)
 		renderSettings(containerEl, '重试设置', RETRY_SETTINGS, this.plugin)
