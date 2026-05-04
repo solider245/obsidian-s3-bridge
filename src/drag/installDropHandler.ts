@@ -9,6 +9,7 @@ import { activityLog } from '../activityLog'
 import { generateUploadId } from '../utils/generateUploadId'
 import { getErrorMessage, getErrorType } from '../utils/errorHandling'
 import { stashFailed } from '../retry/retryCache'
+import { resizeImage } from '../compress/imageResize'
 
 export interface DropCtx {
 	plugin: Plugin
@@ -28,6 +29,9 @@ export function installDropHandler(ctx: DropCtx): void {
 				const imageFiles = allFiles.filter(f => f.type.startsWith('image/'))
 				if (imageFiles.length === 0) return
 
+				// 检查拖拽上传开关
+				if (!(window.__obS3_enableDragDrop__ ?? true)) return
+
 				// 阻止默认拖拽行为
 				evt.preventDefault()
 
@@ -35,7 +39,7 @@ export function installDropHandler(ctx: DropCtx): void {
 				if (imageFiles.length < allFiles.length) {
 					const skipped = allFiles.filter(f => !f.type.startsWith('image/'))
 					const names = skipped.map(f => f.name).join(', ')
-					console.warn('[ob-s3] Skipped non-image files in mixed drop:', names)
+					new Notice('Skipped non-image files: ' + names)
 				}
 
 				const config = loadS3Config(plugin)
@@ -51,6 +55,21 @@ export function installDropHandler(ctx: DropCtx): void {
 					const arrayBuffer = await file.arrayBuffer()
 					const base64 = Buffer.from(arrayBuffer).toString('base64')
 					const mime = file.type || 'application/octet-stream'
+
+					// Compression
+					const shouldCompress = window.__obS3_enableImageCompression__ ?? true
+					let uploadBase64 = base64
+					let uploadMime = mime
+					if (shouldCompress && mime.startsWith('image/') && !mime.includes('svg')) {
+						const maxDim = window.__obS3_maxImageDimension__ ?? 1920
+						const quality = (window.__obS3_imageQuality__ ?? 85) / 100
+						try {
+							uploadBase64 = await resizeImage(base64, mime, maxDim, quality)
+						} catch {
+							// Use original if compression fails
+						}
+					}
+
 					const ext = getExt(mime)
 					const uploadId = generateUploadId()
 					const key = makeObjectKey(file.name, ext, config.keyPrefix || '', uploadId)
@@ -71,15 +90,15 @@ export function installDropHandler(ctx: DropCtx): void {
 					try {
 						finalUrl = await performUpload(plugin, {
 							key,
-							mime,
-							base64,
+							mime: uploadMime,
+							base64: uploadBase64,
 							fileName: file.name,
 							uploadId,
 						})
 					} catch (e: unknown) {
 						const errorMsg = getErrorMessage(e)
 						const errorType = getErrorType(e)
-						stashFailed(uploadId, { key, mime, base64, fileName: file.name })
+						stashFailed(uploadId, { key, mime: uploadMime, base64: uploadBase64, fileName: file.name })
 						editor.replaceRange(
 							`![${file.name} ob-s3:id=${uploadId} status=failed](#) [Retry](#)`,
 							startPos,

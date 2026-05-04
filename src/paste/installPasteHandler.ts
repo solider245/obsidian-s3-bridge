@@ -25,112 +25,113 @@ export function installPasteHandler(ctx: PasteCtx): void {
 				const items = evt.clipboardData?.items
 				if (!items || items.length === 0) return
 
-				const fileItem = Array.from(items).find(
+				const imageItems = Array.from(items).filter(
 					it => it.kind === 'file' && it.type.startsWith('image/')
 				)
-				if (fileItem) {
-					const file = fileItem.getAsFile()
-					if (!file) return
-
-					// 阻止默认粘贴行为
+				if (imageItems.length > 0) {
+					// 阻止默认粘贴行为（批量）
 					evt.preventDefault()
 
-					const placeholder = `![Uploading ${file.name}...]()`
-					const startPos = editor.getCursor()
-					editor.replaceSelection(placeholder)
-					const endPos = editor.getCursor()
+					for (const fileItem of imageItems) {
+						const file = fileItem.getAsFile()
+						if (!file) continue
 
-					const arrayBuffer = await file.arrayBuffer()
-					const base64 = Buffer.from(arrayBuffer).toString('base64')
-					const mime = file.type || 'application/octet-stream'
+						const placeholder = `![Uploading ${file.name}...]()`
+						const startPos = editor.getCursor()
+						editor.replaceSelection(placeholder)
+						const endPos = editor.getCursor()
 
-					// Check if compression is enabled
-					const shouldCompress = window.__obS3_enableImageCompression__ ?? true
-					let uploadBase64 = base64
-					let uploadMime = mime
-					if (shouldCompress && mime.startsWith('image/') && !mime.includes('svg')) {
-						const maxDim = window.__obS3_maxImageDimension__ ?? 1920
-						const quality = (window.__obS3_imageQuality__ ?? 85) / 100
+						const arrayBuffer = await file.arrayBuffer()
+						const base64 = Buffer.from(arrayBuffer).toString('base64')
+						const mime = file.type || 'application/octet-stream'
+
+						// Check if compression is enabled
+						const shouldCompress = window.__obS3_enableImageCompression__ ?? true
+						let uploadBase64 = base64
+						let uploadMime = mime
+						if (shouldCompress && mime.startsWith('image/') && !mime.includes('svg')) {
+							const maxDim = window.__obS3_maxImageDimension__ ?? 1920
+							const quality = (window.__obS3_imageQuality__ ?? 85) / 100
+							try {
+								const resized = await resizeImage(base64, mime, maxDim, quality)
+								uploadBase64 = resized
+							} catch {
+								// If compression fails, use original
+							}
+						}
+
+						const ext = getExt(mime)
+
+						const config = loadS3Config(plugin)
+						const uploadId = generateUploadId()
+						const key = makeObjectKey(file.name, ext, config.keyPrefix || '', uploadId)
+
+						const maxMB = window.__obS3_maxUploadMB__ ?? 5
+						const limitBytes = Math.max(1, Number(maxMB)) * 1024 * 1024
+						if (file.size > limitBytes) {
+							const ok = confirm(
+								`File size (${(file.size / 1024 / 1024).toFixed(1)}MB) exceeds limit (${maxMB}MB). Continue upload?`
+							)
+							if (!ok) {
+								editor.replaceRange('', startPos, endPos)
+								new Notice('Upload canceled: file too large')
+								continue
+							}
+						}
+
+						let finalUrl = ''
+						const startTime = Date.now()
 						try {
-							const resized = await resizeImage(base64, mime, maxDim, quality)
-							uploadBase64 = resized
-						} catch {
-							// If compression fails, use original
+							finalUrl = await performUpload(plugin, {
+								key,
+								mime: uploadMime,
+								base64: uploadBase64,
+								fileName: file.name,
+								uploadId,
+							})
+						} catch (e: unknown) {
+							const errorMsg = getErrorMessage(e)
+							const errorType = getErrorType(e)
+							stashFailed(uploadId, { key, mime: uploadMime, base64: uploadBase64, fileName: file.name })
+							editor.replaceRange(
+								`![${file.name} ob-s3:id=${uploadId} status=failed](#) [Retry](#)`,
+								startPos,
+								endPos
+							)
+							new Notice(tp('Upload failed: {error}', { error: errorMsg }))
+							await activityLog.add(plugin.app, 'upload_error', {
+								error: errorMsg,
+								fileName: file.name,
+								source: 'paste',
+								errorType,
+							})
+							continue
 						}
-					}
 
-					const ext = getExt(mime)
-
-					const config = loadS3Config(plugin)
-					const uploadId = generateUploadId()
-					const key = makeObjectKey(file.name, ext, config.keyPrefix || '', uploadId)
-
-					const maxMB = window.__obS3_maxUploadMB__ ?? 5
-					const limitBytes = Math.max(1, Number(maxMB)) * 1024 * 1024
-					if (file.size > limitBytes) {
-						const ok = confirm(
-							`File size (${(file.size / 1024 / 1024).toFixed(1)}MB) exceeds limit (${maxMB}MB). Continue upload?`
-						)
-						if (!ok) {
-							editor.replaceRange('', startPos, endPos)
-							new Notice('Upload canceled: file too large')
-							return
+						const markdownLink = `![${file.name}](${finalUrl})`
+						const currentText = editor.getRange(startPos, endPos)
+						if (currentText === placeholder) {
+							editor.replaceRange(markdownLink, startPos, endPos)
+						} else {
+							editor.replaceSelection(markdownLink)
 						}
-					}
 
-					let finalUrl = ''
-					const startTime = Date.now()
-					try {
-						finalUrl = await performUpload(plugin, {
-							key,
-							mime: uploadMime,
-							base64: uploadBase64,
-							fileName: file.name,
-							uploadId,
-						})
-					} catch (e: unknown) {
-						const errorMsg = getErrorMessage(e)
-						const errorType = getErrorType(e)
-						stashFailed(uploadId, { key, mime: uploadMime, base64: uploadBase64, fileName: file.name })
-						editor.replaceRange(
-							`![${file.name} ob-s3:id=${uploadId} status=failed](#) [Retry](#)`,
-							startPos,
-							endPos
+						const durationInSeconds = ((Date.now() - startTime) / 1000).toFixed(2)
+						const sizeMB = (file.size / 1024 / 1024).toFixed(2)
+						new Notice(
+							tp('Upload successful! Time: {duration}s, Size: {size}MB', {
+								duration: durationInSeconds,
+								size: sizeMB,
+							})
 						)
-						new Notice(tp('Upload failed: {error}', { error: errorMsg }))
-						await activityLog.add(plugin.app, 'upload_error', {
-							error: errorMsg,
+						await activityLog.add(plugin.app, 'upload_success', {
+							url: finalUrl,
 							fileName: file.name,
 							source: 'paste',
-							errorType,
+							size: file.size,
+							duration: parseFloat(durationInSeconds),
 						})
-						return
 					}
-
-					const markdownLink = `![${file.name}](${finalUrl})`
-					const currentText = editor.getRange(startPos, endPos)
-					if (currentText === placeholder) {
-						editor.replaceRange(markdownLink, startPos, endPos)
-					} else {
-						editor.replaceSelection(markdownLink)
-					}
-
-					const durationInSeconds = ((Date.now() - startTime) / 1000).toFixed(2)
-					const sizeMB = (file.size / 1024 / 1024).toFixed(2)
-					new Notice(
-						tp('Upload successful! Time: {duration}s, Size: {size}MB', {
-							duration: durationInSeconds,
-							size: sizeMB,
-						})
-					)
-					await activityLog.add(plugin.app, 'upload_success', {
-						url: finalUrl,
-						fileName: file.name,
-						source: 'paste',
-						size: file.size,
-						duration: parseFloat(durationInSeconds),
-					})
-
 					return
 				}
 

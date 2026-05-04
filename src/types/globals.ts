@@ -7,6 +7,7 @@ declare global {
 		__obS3_enableImageCompression__?: boolean
 		__obS3_maxImageDimension__?: number
 		__obS3_imageQuality__?: number
+		__obS3_enableDragDrop__?: boolean
 	}
 }
 

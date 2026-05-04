@@ -218,6 +218,7 @@ export default class S3BridgePlugin extends Plugin {
 		window.__obS3_enableImageCompression__ = this.settings.enableImageCompression
 		window.__obS3_maxImageDimension__ = this.settings.maxImageDimension
 		window.__obS3_imageQuality__ = this.settings.imageQuality
+		window.__obS3_enableDragDrop__ = this.settings.enableDragDrop
 	}
 
 	/**
