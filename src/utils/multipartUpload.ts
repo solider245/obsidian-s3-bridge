@@ -432,35 +432,6 @@ export async function createMultipartUpload(
 
 	// 判断是否需要分片上传（使用统一常量）
 
-	if (fileSize < UPLOAD.MULTIPART_THRESHOLD) {
-		// 小文件使用普通上传
-		const { presignAndPutObject } = await import('../uploader/presignPut')
-		let bodyBase64: string
-
-		if (options.fileData) {
-			bodyBase64 =
-				typeof options.fileData === 'string'
-					? options.fileData
-					: Buffer.from(options.fileData).toString('base64')
-		} else if (options.filePath) {
-			const fs = await import('fs')
-			const { promisify } = await import('util')
-			const readFile = promisify(fs.readFile)
-			const data = await readFile(options.filePath)
-			bodyBase64 = data.toString('base64')
-		} else {
-			throw new Error('No data source provided for small file upload')
-		}
-
-		return presignAndPutObject(plugin, {
-			key: options.key,
-			contentType: options.contentType,
-			bodyBase64,
-			presignTimeoutMs: options.presignTimeoutMs,
-			uploadTimeoutMs: options.uploadTimeoutMs,
-		})
-	}
-
 	// 大文件使用分片上传
 	const manager = new MultipartUploadManager(plugin, {
 		...options,

@@ -100,7 +100,7 @@ export async function performUpload(
 
 		const sec = Math.max(0, (nowMs() - t0) / 1000)
 		try {
-			console.info('[ob-s3-gemini] upload success', { key, durationSec: Number(sec.toFixed(3)) })
+			console.info('[ob-s3-gemini] upload success', { key, durationSec: Math.round(sec * 1000) / 1000 })
 		} catch {}
 
 		// 更新进度：处理阶段
@@ -116,7 +116,7 @@ export async function performUpload(
 		try {
 			console.error('[ob-s3-gemini] upload failed', {
 				key,
-				durationSec: Number(sec.toFixed(3)),
+				durationSec: Math.round(sec * 1000) / 1000,
 				error: errorMsg,
 			})
 		} catch {}

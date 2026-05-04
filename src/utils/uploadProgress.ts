@@ -54,6 +54,7 @@ export class UploadProgressManager {
 			message: 'Preparing upload...',
 			fileName: options.fileName,
 			fileSize: options.fileSize,
+			lastUpdate: Date.now(),
 		}
 
 		this.uploads.set(id, update)

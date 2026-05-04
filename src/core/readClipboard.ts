@@ -24,7 +24,8 @@ export async function readClipboardImageAsBase64(): Promise<{
 			}
 		}
 		return null
-	} catch {
+	} catch (e) {
+		console.warn('[ob-s3] clipboard read failed', e)
 		return null
 	}
 }

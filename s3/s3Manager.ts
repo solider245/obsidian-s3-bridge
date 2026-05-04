@@ -359,7 +359,6 @@ export function loadS3Config(plugin: Plugin): S3Config {
 export function buildPublicUrl(plugin: Plugin, key: string): string {
 	const p = loadActiveProfile(plugin)
 	const bucket = (p.bucketName || '').trim()
-	const prefix = (p.keyPrefix || '').replace(/^\/+|\/+$/g, '')
 	const finalKey = key.replace(/^\/+/, '')
 
 	// 优先 baseUrl
